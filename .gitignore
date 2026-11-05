@@ -15,6 +15,12 @@ backend/.venv/
 backend/.env
 *.db
 backend/*.db
+backend/uploads/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
 
 # OS / IDE
 .DS_Store

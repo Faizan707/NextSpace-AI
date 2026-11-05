@@ -7,6 +7,7 @@ from app.database import get_db
 from app.models.company import Company
 from app.models.space import Space
 from app.models.user import User
+from app.schemas.admin import MemberRead
 from app.schemas.company import CompanyCreate, CompanyRead, CompanyUpdate
 
 router = APIRouter(prefix="/companies", tags=["companies"])
@@ -42,6 +43,18 @@ def get_my_company(current_user: User = Depends(get_current_user)) -> Company:
     if current_user.company is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
     return current_user.company
+
+
+@router.get("/me/members", response_model=list[MemberRead])
+def list_my_company_members(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[User]:
+    return list(
+        db.scalars(
+            select(User).where(User.company_id == current_user.company_id).order_by(User.created_at)
+        ).all()
+    )
 
 
 @router.get("/{company_id}", response_model=CompanyRead)

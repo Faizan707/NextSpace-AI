@@ -9,6 +9,7 @@ from app.database import Base
 
 if TYPE_CHECKING:
     from app.models.company import Company
+    from app.models.space_member import SpaceMember
     from app.models.user import User
 
 
@@ -31,3 +32,7 @@ class Space(Base):
 
     company: Mapped["Company"] = relationship(back_populates="spaces")
     created_by: Mapped["User"] = relationship(back_populates="spaces")
+    memberships: Mapped[list["SpaceMember"]] = relationship(
+        back_populates="space",
+        cascade="all, delete-orphan",
+    )

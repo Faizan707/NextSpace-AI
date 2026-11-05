@@ -8,15 +8,29 @@ FastAPI + SQLAlchemy + pwdlib (Argon2) + PyJWT.
 uv sync
 ```
 
-Copy `.env` if needed and set `JWT_SECRET`.
+Copy `.env` if needed and set `DATABASE_URL` + `JWT_SECRET`.
+
+### Migrations (Alembic)
+
+```bash
+# create a new migration after model changes
+uv run alembic revision --autogenerate -m "describe change"
+
+# apply migrations
+uv run alembic upgrade head
+
+# rollback one step
+uv run alembic downgrade -1
+```
 
 ## Run
 
 ```bash
-uv run fastapi dev app/main.py
+uv run alembic upgrade head
+uv run fastapi dev app/main.py --port 8001
 ```
 
-API docs: http://127.0.0.1:8000/docs
+API docs: http://127.0.0.1:8001/docs
 
 ## Main routes
 

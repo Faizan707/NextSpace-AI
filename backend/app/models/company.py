@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
 if TYPE_CHECKING:
+    from app.models.invite import Invite
     from app.models.space import Space
     from app.models.user import User
 
@@ -22,3 +23,4 @@ class Company(Base):
 
     users: Mapped[list["User"]] = relationship(back_populates="company")
     spaces: Mapped[list["Space"]] = relationship(back_populates="company")
+    invites: Mapped[list["Invite"]] = relationship(back_populates="company")

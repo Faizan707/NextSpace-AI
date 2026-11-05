@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.space import SpaceType
 
@@ -17,6 +17,15 @@ class SpaceUpdate(BaseModel):
     space_type: SpaceType | None = None
 
 
+class SpaceCreatorRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    email: EmailStr
+    full_name: str | None
+    avatar_url: str | None = None
+
+
 class SpaceRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -26,4 +35,10 @@ class SpaceRead(BaseModel):
     space_type: SpaceType
     company_id: int
     created_by_id: int
+    created_by: SpaceCreatorRead
+    members: list[SpaceCreatorRead] = []
     created_at: datetime
+
+
+class SpaceMembersAdd(BaseModel):
+    user_ids: list[int] = Field(min_length=1)
