@@ -56,6 +56,7 @@ def _to_work_task(task: ProjectTask) -> WorkTaskRead:
         stage_name=stage.name if stage else "",
         title=task.title,
         description=task.description,
+        priority=getattr(task, "priority", None) or "medium",
         position=task.position,
         assignee_id=task.assignee_id,
         assignee=SpaceCreatorRead.model_validate(task.assignee) if task.assignee else None,

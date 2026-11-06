@@ -39,6 +39,7 @@ def _task_to_read(task: ProjectTask) -> TaskRead:
         stage_id=task.stage_id,
         title=task.title,
         description=task.description,
+        priority=task.priority,  # type: ignore[arg-type]
         position=task.position,
         assignee_id=task.assignee_id,
         assignee=SpaceCreatorRead.model_validate(task.assignee) if task.assignee else None,
@@ -219,6 +220,7 @@ def create_task(
         stage_id=stage.id,
         title=payload.title.strip(),
         description=payload.description,
+        priority=payload.priority,
         position=next_task_position(db, stage.id),
         assignee_id=payload.assignee_id,
         created_by_id=current_user.id,

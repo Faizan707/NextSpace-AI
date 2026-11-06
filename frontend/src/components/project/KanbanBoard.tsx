@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatDistanceToNow } from 'date-fns'
 import {
   DndContext,
   DragOverlay,
@@ -18,10 +19,17 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { FiPlus } from 'react-icons/fi'
-import { Avatar } from '../Avatar'
+import {
+  FiBookmark,
+  FiCalendar,
+  FiClock,
+  FiEdit2,
+  FiPlus,
+  FiTrash2,
+  FiUser,
+} from 'react-icons/fi'
 import { Button, ContextMenu, controlClass } from '../ui'
-import type { ProjectStage, ProjectTask } from '../../types'
+import type { ProjectStage, ProjectTask, TaskPriority } from '../../types'
 import { MoreIcon } from '../space/icons'
 import { cn } from '../../lib/cn'
 
@@ -37,144 +45,184 @@ interface KanbanBoardProps {
   onAddStage: (name: string) => Promise<void>
 }
 
-function DragGrip() {
-  return (
-    <span className="grid grid-cols-2 gap-0.5" aria-hidden>
-      {Array.from({ length: 6 }, (_, index) => (
-        <span key={index} className="size-1 rounded-full bg-current opacity-50" />
-      ))}
-    </span>
-  )
+function formatCardDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+function formatTimeAgo(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  const distance = formatDistanceToNow(date).replace(/^about /, '')
+  return `created ${distance} ago`
+}
+
+function stageProgress(stageName: string) {
+  const key = stageName.trim().toLowerCase()
+  if (key === 'todo') return 8
+  if (key === 'done' || key === 'complete' || key === 'completed') return 100
+  return 50
+}
+
+function priorityMeta(priority: TaskPriority | undefined) {
+  if (priority === 'high') return { label: 'High', className: 'text-danger' }
+  if (priority === 'low') return { label: 'Low', className: 'text-muted' }
+  return { label: 'Medium', className: 'text-[#ea580c]' }
 }
 
 function TaskCard({
   task,
+  stageName,
   dragging,
   dragHandleProps,
   onEdit,
   onDelete,
 }: {
   task: ProjectTask
+  stageName: string
   dragging?: boolean
   dragHandleProps?: Record<string, unknown>
   onEdit?: () => void
   onDelete?: () => void
 }) {
+  const progress = stageProgress(stageName)
+  const priority = priorityMeta(task.priority)
+  const created = formatCardDate(task.created_at)
+  const createdAgo = formatTimeAgo(task.created_at)
+  const assigneeLabel = task.assignee?.full_name || task.assignee?.email || 'Unassigned'
+
   return (
     <article
       className={cn(
-        'group relative overflow-hidden rounded-[20px] border border-line bg-surface',
-        'shadow-[0_8px_22px_rgba(15,23,42,0.05)] transition duration-200',
-        'hover:-translate-y-0.5 hover:shadow-[var(--shadow-panel)]',
-        dragging && 'scale-[1.02] shadow-[var(--shadow-panel)] ring-2 ring-teal/25',
+        'group relative rounded-xl border border-line bg-surface',
+        'shadow-[0_6px_18px_rgba(15,23,42,0.06)] transition duration-200',
+        'hover:shadow-[0_10px_28px_rgba(15,23,42,0.1)]',
+        dragging && 'scale-[1.02] cursor-grabbing shadow-[0_14px_32px_rgba(15,23,42,0.12)] ring-2 ring-accent/25',
+        dragHandleProps && !dragging && 'cursor-grab',
       )}
+      {...(dragHandleProps || {})}
     >
-      <div className="absolute inset-y-3 left-0 w-1 rounded-full bg-teal/70 opacity-0 transition group-hover:opacity-100" />
-
-      <div className="flex items-start gap-1 px-3.5 pt-3.5">
-        {dragHandleProps ? (
-          <button
-            type="button"
-            title="Drag task"
-            aria-label={`Drag ${task.title}`}
-            className="mt-0.5 grid size-7 shrink-0 cursor-grab place-items-center rounded-lg text-muted/70 transition hover:bg-surface-2 hover:text-ink active:cursor-grabbing"
-            {...dragHandleProps}
-          >
-            <DragGrip />
-          </button>
-        ) : (
-          <span className="mt-0.5 grid size-7 shrink-0 place-items-center text-muted/50">
-            <DragGrip />
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onEdit}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            onEdit?.()
+          }
+        }}
+        className="block w-full px-4 pb-3 pt-3.5 text-left"
+      >
+        <div className="flex items-center justify-between gap-3 text-[0.72rem] text-muted">
+          <span className="inline-flex items-center gap-1.5">
+            <FiCalendar size={13} aria-hidden />
+            {created}
           </span>
+          <span className="inline-flex items-center gap-1.5" title="Created">
+            <FiClock size={13} aria-hidden />
+            {createdAgo}
+          </span>
+        </div>
+
+        <h4 className="mt-3 m-0 line-clamp-2 text-[0.98rem] font-bold leading-snug text-ink">
+          {task.title}
+        </h4>
+
+        {task.description ? (
+          <p className="mt-1.5 m-0 line-clamp-2 text-[0.8rem] leading-relaxed text-muted">
+            {task.description}
+          </p>
+        ) : (
+          <p className="mt-1.5 m-0 text-[0.8rem] text-muted/70">No description</p>
         )}
 
+        <div className="mt-3 flex items-center gap-1.5 text-[0.8rem] font-medium text-ink/80">
+          <FiBookmark size={14} className="text-[#7c6cf0]" aria-hidden />
+          Task
+        </div>
+
+        <p className={cn('mt-1.5 m-0 text-[0.8rem] font-semibold', priority.className)}>
+          {priority.label}
+        </p>
+
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#e8f5f0]">
+          <div
+            className="h-full rounded-full bg-[#2dd4bf] transition-[width] duration-300"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+
+      <div
+        className="flex items-center justify-between gap-2 border-t border-line px-3.5 py-2.5"
+        onPointerDown={(event) => event.stopPropagation()}
+      >
         <button
           type="button"
           onClick={onEdit}
-          className="min-w-0 flex-1 cursor-pointer py-0.5 text-left"
+          className="inline-flex min-w-0 cursor-pointer items-center gap-1.5 text-left text-[0.8rem] font-semibold text-ink"
         >
-          <h4 className="m-0 line-clamp-2 font-display text-[0.95rem] font-bold leading-snug text-ink">
-            {task.title}
-          </h4>
+          <span className="grid size-6 shrink-0 place-items-center rounded-md border border-line text-muted">
+            <FiUser size={12} aria-hidden />
+          </span>
+          <span className="truncate">{assigneeLabel}</span>
         </button>
 
-        {onDelete ? (
-          <ContextMenu
-            align="end"
-            trigger={({ open, props }) => (
-              <button
-                {...props}
-                aria-label={`Task actions for ${task.title}`}
-                className={cn(
-                  'grid size-7 shrink-0 cursor-pointer place-items-center rounded-lg text-muted transition hover:bg-surface-2 hover:text-ink',
-                  open && 'bg-surface-2 text-ink',
-                )}
-              >
-                <MoreIcon />
-              </button>
-            )}
-            items={[
-              {
-                id: 'edit',
-                label: 'Edit',
-                onSelect: () => onEdit?.(),
-              },
-              {
-                id: 'delete',
-                label: 'Delete',
-                danger: true,
-                onSelect: () => onDelete(),
-              },
-            ]}
-          />
-        ) : null}
-      </div>
-
-      <button
-        type="button"
-        onClick={onEdit}
-        className="block w-full cursor-pointer px-3.5 pb-3.5 text-left"
-      >
-        {task.description ? (
-          <p className="mt-1.5 m-0 line-clamp-2 pl-8 text-xs leading-relaxed text-muted">
-            {task.description}
-          </p>
-        ) : null}
-
-        <div className="mt-3 ml-8 overflow-hidden rounded-xl bg-surface-2">
-          {task.assignee ? (
-            <div className="flex items-center gap-2 px-2.5 py-2">
-              <Avatar
-                name={task.assignee.full_name}
-                email={task.assignee.email}
-                imageUrl={task.assignee.avatar_url}
-                className="size-6 text-[0.6rem]"
-              />
-              <span className="truncate text-xs font-medium text-ink">
-                {task.assignee.full_name || task.assignee.email}
-              </span>
-            </div>
-          ) : (
-            <div className="px-2.5 py-2 text-xs font-medium text-muted">Unassigned</div>
-          )}
+        <div className="flex shrink-0 items-center gap-0.5 text-muted">
+          {onEdit ? (
+            <button
+              type="button"
+              title="Edit task"
+              aria-label={`Edit ${task.title}`}
+              onClick={(event) => {
+                event.stopPropagation()
+                onEdit()
+              }}
+              className="grid size-7 cursor-pointer place-items-center rounded-md transition hover:bg-surface-2 hover:text-ink"
+            >
+              <FiEdit2 size={13} aria-hidden />
+            </button>
+          ) : null}
+          {onDelete ? (
+            <button
+              type="button"
+              title="Delete task"
+              aria-label={`Delete ${task.title}`}
+              onClick={(event) => {
+                event.stopPropagation()
+                onDelete()
+              }}
+              className="grid size-7 cursor-pointer place-items-center rounded-md transition hover:bg-danger-soft hover:text-danger"
+            >
+              <FiTrash2 size={13} aria-hidden />
+            </button>
+          ) : null}
         </div>
-      </button>
+      </div>
     </article>
   )
 }
 
 function SortableTask({
   task,
+  stageName,
   onEdit,
   onDelete,
 }: {
   task: ProjectTask
+  stageName: string
   onEdit: () => void
   onDelete: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `task-${task.id}`,
-    data: { type: 'task', task },
+    data: { type: 'task', task, stageName },
   })
 
   return (
@@ -189,6 +237,8 @@ function SortableTask({
     >
       <TaskCard
         task={task}
+        stageName={stageName}
+        dragging={isDragging}
         onEdit={onEdit}
         onDelete={onDelete}
         dragHandleProps={{ ...attributes, ...listeners }}
@@ -320,6 +370,7 @@ function StageColumn({
             <SortableTask
               key={task.id}
               task={task}
+              stageName={stage.name}
               onEdit={() => onEditTask(task)}
               onDelete={() => void onDeleteTask(task.id)}
             />
@@ -368,14 +419,18 @@ export function KanbanBoard({
   onDeleteStage,
   onAddStage,
 }: KanbanBoardProps) {
-  const [activeTask, setActiveTask] = useState<ProjectTask | null>(null)
+  const [activeTask, setActiveTask] = useState<{
+    task: ProjectTask
+    stageName: string
+  } | null>(null)
   const [stageName, setStageName] = useState('')
   const [addingStage, setAddingStage] = useState(false)
   const [stageBusy, setStageBusy] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: { distance: 6 },
+      // Small move before drag starts so click still opens edit
+      activationConstraint: { distance: 8 },
     }),
   )
 
@@ -403,8 +458,8 @@ export function KanbanBoard({
     const taskId = parseTaskId(event.active.id)
     if (taskId == null) return
     const stage = findStageByTaskId(stages, taskId)
-    const task = stage?.tasks.find((item) => item.id === taskId) || null
-    setActiveTask(task)
+    const task = stage?.tasks.find((item) => item.id === taskId)
+    setActiveTask(task && stage ? { task, stageName: stage.name } : null)
   }
 
   function handleDragOver(event: DragOverEvent) {
@@ -563,7 +618,9 @@ export function KanbanBoard({
         </div>
 
         <DragOverlay>
-          {activeTask ? <TaskCard task={activeTask} dragging /> : null}
+          {activeTask ? (
+            <TaskCard task={activeTask.task} stageName={activeTask.stageName} dragging />
+          ) : null}
         </DragOverlay>
       </DndContext>
     </div>

@@ -151,12 +151,15 @@ export interface SpaceDocument {
   created_at: string
 }
 
+export type TaskPriority = 'low' | 'medium' | 'high'
+
 export interface ProjectTask {
   id: number
   project_id: number
   stage_id: number
   title: string
   description: string | null
+  priority: TaskPriority
   position: number
   assignee_id: number | null
   assignee: SpaceCreator | null
@@ -194,6 +197,7 @@ export interface WorkTask {
   stage_name: string
   title: string
   description: string | null
+  priority: TaskPriority
   position: number
   assignee_id: number | null
   assignee: SpaceCreator | null

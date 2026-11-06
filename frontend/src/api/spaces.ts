@@ -173,6 +173,7 @@ export function createTask(
     title: string
     description?: string | null
     stage_id: number
+    priority?: ProjectTask['priority']
     assignee_id?: number | null
   },
 ) {
@@ -193,6 +194,7 @@ export function updateTask(
     description?: string | null
     stage_id?: number
     position?: number
+    priority?: ProjectTask['priority']
     assignee_id?: number | null
   },
 ) {

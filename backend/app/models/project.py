@@ -18,6 +18,12 @@ class ProjectStatus(StrEnum):
     COMPLETED = "completed"
 
 
+class TaskPriority(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
 DEFAULT_PROJECT_STAGES = (
     ("Todo", True),
     ("In Progress", True),
@@ -96,6 +102,7 @@ class ProjectTask(Base):
     stage_id: Mapped[int] = mapped_column(ForeignKey("project_stages.id", ondelete="CASCADE"), index=True)
     title: Mapped[str] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    priority: Mapped[str] = mapped_column(String(16), default=TaskPriority.MEDIUM.value, index=True)
     position: Mapped[int] = mapped_column(Integer, default=0)
     assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)

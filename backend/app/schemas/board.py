@@ -1,8 +1,11 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.space import SpaceCreatorRead
+
+TaskPriorityValue = Literal["low", "medium", "high"]
 
 
 class StageCreate(BaseModel):
@@ -18,6 +21,7 @@ class TaskCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     description: str | None = None
     stage_id: int
+    priority: TaskPriorityValue = "medium"
     assignee_id: int | None = None
 
 
@@ -26,6 +30,7 @@ class TaskUpdate(BaseModel):
     description: str | None = None
     stage_id: int | None = None
     position: int | None = Field(default=None, ge=0)
+    priority: TaskPriorityValue | None = None
     assignee_id: int | None = None
 
 
@@ -37,6 +42,7 @@ class TaskRead(BaseModel):
     stage_id: int
     title: str
     description: str | None
+    priority: TaskPriorityValue
     position: int
     assignee_id: int | None
     assignee: SpaceCreatorRead | None = None

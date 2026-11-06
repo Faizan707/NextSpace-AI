@@ -42,6 +42,7 @@ export function useCreateTaskMutation(spaceId: number, projectId: number) {
       title: string
       description?: string | null
       stage_id: number
+      priority?: ProjectTask['priority']
       assignee_id?: number | null
     }) => spacesApi.createTask(requireToken(token), spaceId, projectId, payload),
     onSuccess: (task) => {
@@ -78,6 +79,7 @@ export function useUpdateTaskMutation(spaceId: number, projectId: number) {
         description?: string | null
         stage_id?: number
         position?: number
+        priority?: ProjectTask['priority']
         assignee_id?: number | null
       }
     }) => spacesApi.updateTask(requireToken(token), spaceId, projectId, taskId, payload),

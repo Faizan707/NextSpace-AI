@@ -52,6 +52,22 @@ export function TasksPage() {
         cell: (task) => <Badge tone={stageTone(task.stage_name)}>{task.stage_name}</Badge>,
       },
       {
+        id: 'priority',
+        header: 'Priority',
+        sortable: true,
+        sortValue: (task) => task.priority || 'medium',
+        cell: (task) => {
+          const priority = task.priority || 'medium'
+          const tone =
+            priority === 'high' ? 'orange' : priority === 'low' ? 'blue' : 'purple'
+          return (
+            <Badge tone={tone} className="capitalize">
+              {priority}
+            </Badge>
+          )
+        },
+      },
+      {
         id: 'project',
         header: 'Project',
         sortable: true,

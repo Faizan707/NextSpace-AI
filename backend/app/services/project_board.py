@@ -71,6 +71,7 @@ def _task_to_read(task: ProjectTask) -> TaskRead:
         stage_id=task.stage_id,
         title=task.title,
         description=task.description,
+        priority=getattr(task, "priority", None) or "medium",  # type: ignore[arg-type]
         position=task.position,
         assignee_id=task.assignee_id,
         assignee=SpaceCreatorRead.model_validate(task.assignee) if task.assignee else None,

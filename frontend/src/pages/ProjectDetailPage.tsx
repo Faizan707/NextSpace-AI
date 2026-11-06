@@ -82,6 +82,7 @@ export function ProjectDetailPage() {
             title: payload.title,
             description: payload.description,
             stage_id: payload.stage_id,
+            priority: payload.priority,
             assignee_id: payload.assignee_id,
           },
         })
@@ -91,6 +92,7 @@ export function ProjectDetailPage() {
           title: payload.title,
           description: payload.description,
           stage_id: payload.stage_id,
+          priority: payload.priority,
           assignee_id: payload.assignee_id,
         })
         toast.success('Task created', created.title)

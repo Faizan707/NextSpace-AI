@@ -79,6 +79,11 @@ def _ensure_project_columns() -> None:
         "progress",
         "ALTER TABLE projects ADD COLUMN progress INTEGER NOT NULL DEFAULT 0",
     )
+    _ensure_column(
+        "project_tasks",
+        "priority",
+        "ALTER TABLE project_tasks ADD COLUMN priority VARCHAR(16) NOT NULL DEFAULT 'medium'",
+    )
 
 
 def _ensure_user_job_role_columns() -> None:

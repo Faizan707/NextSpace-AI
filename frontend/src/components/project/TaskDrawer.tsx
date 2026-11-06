@@ -1,14 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Alert, Button, Drawer, Input, Select, Textarea } from '../ui'
-import type { ProjectStage, ProjectTask, SpaceCreator } from '../../types'
+import type { ProjectStage, ProjectTask, SpaceCreator, TaskPriority } from '../../types'
 
 export interface TaskFormPayload {
   title: string
   description: string | null
   stage_id: number
+  priority: TaskPriority
   assignee_id: number | null
 }
+
+const PRIORITY_OPTIONS = [
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+]
 
 interface TaskDrawerProps {
   open: boolean
@@ -34,6 +41,7 @@ export function TaskDrawer({
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [stageId, setStageId] = useState('')
+  const [priority, setPriority] = useState<TaskPriority>('medium')
   const [assigneeId, setAssigneeId] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -60,6 +68,7 @@ export function TaskDrawer({
       setTitle(editing.title)
       setDescription(editing.description || '')
       setStageId(String(editing.stage_id))
+      setPriority(editing.priority || 'medium')
       setAssigneeId(editing.assignee_id != null ? String(editing.assignee_id) : '')
       return
     }
@@ -72,6 +81,7 @@ export function TaskDrawer({
           ? String(stages[0].id)
           : '',
     )
+    setPriority('medium')
     setAssigneeId('')
   }, [open, editing, initialStageId, stages])
 
@@ -92,6 +102,7 @@ export function TaskDrawer({
         title: trimmed,
         description: description.trim() || null,
         stage_id: Number(stageId),
+        priority,
         assignee_id: assigneeId ? Number(assigneeId) : null,
       })
     } catch (err) {
@@ -140,6 +151,15 @@ export function TaskDrawer({
           onChange={setStageId}
           options={stageOptions}
           placeholder="Select stage"
+        />
+
+        <Select
+          id="task-priority"
+          label="Priority"
+          required
+          value={priority}
+          onChange={(value) => setPriority(value as TaskPriority)}
+          options={PRIORITY_OPTIONS}
         />
 
         <Select

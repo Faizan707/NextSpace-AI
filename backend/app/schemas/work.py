@@ -35,6 +35,7 @@ class WorkTaskRead(BaseModel):
     stage_name: str
     title: str
     description: str | None
+    priority: str = "medium"
     position: int
     assignee_id: int | None
     assignee: SpaceCreatorRead | None = None
