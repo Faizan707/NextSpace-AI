@@ -14,6 +14,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@tailwindcss/vite": "^4.3.4",
+    "@tanstack/react-query": "^5.106.1",
     "country-list": "^2.4.1",
     "date-fns": "^4.4.0",
     "mammoth": "^1.13.0",

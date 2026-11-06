@@ -25,6 +25,7 @@ from app.services.project_board import (
     get_task_in_project,
     next_stage_position,
     next_task_position,
+    recalculate_project_progress,
 )
 from app.services.space_access import get_accessible_space
 
@@ -149,6 +150,8 @@ def update_stage(
     for field, value in data.items():
         setattr(stage, field, value)
 
+    if "name" in data:
+        recalculate_project_progress(db, project_id)
     db.commit()
     db.refresh(stage)
     return _stage_to_read(stage)
@@ -221,6 +224,8 @@ def create_task(
         created_by_id=current_user.id,
     )
     db.add(task)
+    db.flush()
+    recalculate_project_progress(db, project_id)
     db.commit()
     created = get_task_in_project(db, project_id, task.id)
     return _task_to_read(created)
@@ -258,6 +263,8 @@ def update_task(
     for field, value in data.items():
         setattr(task, field, value)
 
+    db.flush()
+    recalculate_project_progress(db, project_id)
     db.commit()
     updated = get_task_in_project(db, project_id, task.id)
     return _task_to_read(updated)
@@ -280,4 +287,6 @@ def delete_task(
     if task is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
     db.delete(task)
+    db.flush()
+    recalculate_project_progress(db, project_id)
     db.commit()

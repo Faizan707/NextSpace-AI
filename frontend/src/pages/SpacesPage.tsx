@@ -3,24 +3,34 @@ import { AddSpaceMembersDrawer } from '../components/AddSpaceMembersDrawer'
 import { SpaceCard } from '../components/SpaceCard'
 import { SpaceDrawer } from '../components/SpaceDrawer'
 import { Alert, Button, SpaceCardsSkeleton } from '../components/ui'
+import {
+  useAddSpaceMembersMutation,
+  useCreateSpaceMutation,
+  useDeleteSpaceMutation,
+  useSpacesQuery,
+  useUpdateSpaceMutation,
+} from '../hooks'
 import { useAuthStore } from '../stores/authStore'
-import { useSpaceStore } from '../stores/spaceStore'
 import { toast } from '../stores/toastStore'
 import type { Space, SpacePayload } from '../types'
 
 export function SpacesPage() {
   const user = useAuthStore((s) => s.user)
-  const spaces = useSpaceStore((s) => s.spaces)
-  const spaceLoading = useSpaceStore((s) => s.loading)
-  const spaceError = useSpaceStore((s) => s.error)
-  const createSpace = useSpaceStore((s) => s.createSpace)
-  const updateSpace = useSpaceStore((s) => s.updateSpace)
-  const deleteSpace = useSpaceStore((s) => s.deleteSpace)
-  const addMembers = useSpaceStore((s) => s.addMembers)
+  const { data: spaces = [], isLoading, error } = useSpacesQuery()
+  const createSpace = useCreateSpaceMutation()
+  const updateSpace = useUpdateSpaceMutation()
+  const deleteSpace = useDeleteSpaceMutation()
+  const addMembers = useAddSpaceMembersMutation()
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editing, setEditing] = useState<Space | null>(null)
   const [membersSpace, setMembersSpace] = useState<Space | null>(null)
+
+  const submitting =
+    createSpace.isPending ||
+    updateSpace.isPending ||
+    deleteSpace.isPending ||
+    addMembers.isPending
 
   function openCreate() {
     setEditing(null)
@@ -39,10 +49,10 @@ export function SpacesPage() {
   async function handleSave(payload: SpacePayload) {
     try {
       if (editing) {
-        await updateSpace(editing.id, payload)
+        await updateSpace.mutateAsync({ id: editing.id, payload })
         toast.success('Space updated', payload.name)
       } else {
-        await createSpace(payload)
+        await createSpace.mutateAsync(payload)
         toast.success('Space created', payload.name)
       }
       setDrawerOpen(false)
@@ -57,8 +67,18 @@ export function SpacesPage() {
 
   async function handleAddMembers(userIds: number[]) {
     if (!membersSpace) return
-    await addMembers(membersSpace.id, userIds)
+    await addMembers.mutateAsync({ spaceId: membersSpace.id, userIds })
     setMembersSpace(null)
+  }
+
+  async function handleDelete(space: Space) {
+    if (!window.confirm(`Delete "${space.name}"?`)) return
+    try {
+      await deleteSpace.mutateAsync(space.id)
+      toast.success('Space deleted', space.name)
+    } catch (err) {
+      toast.error('Failed to delete space', err instanceof Error ? err.message : undefined)
+    }
   }
 
   return (
@@ -78,9 +98,13 @@ export function SpacesPage() {
         </Button>
       </section>
 
-      {spaceError ? <Alert className="mb-4">{spaceError}</Alert> : null}
+      {error ? (
+        <Alert className="mb-4">
+          {error instanceof Error ? error.message : 'Failed to load spaces'}
+        </Alert>
+      ) : null}
 
-      {spaceLoading && spaces.length === 0 ? (
+      {isLoading && spaces.length === 0 ? (
         <SpaceCardsSkeleton count={4} />
       ) : spaces.length === 0 ? (
         <div className="rounded-[20px] border border-dashed border-line bg-surface px-4 py-14 text-center">
@@ -99,7 +123,7 @@ export function SpacesPage() {
               canManage={canManage(space)}
               onEdit={openEdit}
               onAddMembers={setMembersSpace}
-              onDelete={(item) => void deleteSpace(item.id)}
+              onDelete={(item) => void handleDelete(item)}
             />
           ))}
         </div>
@@ -109,7 +133,7 @@ export function SpacesPage() {
         open={drawerOpen}
         title={editing ? 'Edit space' : 'Create space'}
         initial={editing}
-        submitting={spaceLoading}
+        submitting={submitting}
         onClose={() => {
           setDrawerOpen(false)
           setEditing(null)
@@ -120,7 +144,7 @@ export function SpacesPage() {
       <AddSpaceMembersDrawer
         open={Boolean(membersSpace)}
         space={membersSpace}
-        submitting={spaceLoading}
+        submitting={addMembers.isPending}
         onClose={() => setMembersSpace(null)}
         onSubmit={handleAddMembers}
       />

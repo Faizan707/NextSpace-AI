@@ -1,13 +1,23 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import * as spacesApi from '../api/spaces'
 import { Avatar } from '../components/Avatar'
 import { KanbanBoard } from '../components/project/KanbanBoard'
 import { TaskDrawer, type TaskFormPayload } from '../components/project/TaskDrawer'
 import { Alert, Button, ProjectDetailSkeleton } from '../components/ui'
-import { useAuthStore } from '../stores/authStore'
+import {
+  setBoardStages,
+  useCreateStageMutation,
+  useCreateTaskMutation,
+  useDeleteStageMutation,
+  useDeleteTaskMutation,
+  useProjectBoardQuery,
+  useProjectQuery,
+  useUpdateStageMutation,
+  useUpdateTaskMutation,
+} from '../hooks'
 import { toast } from '../stores/toastStore'
-import type { ProjectBoard, ProjectStage, ProjectTask, SpaceProject } from '../types'
+import type { ProjectStage, ProjectTask } from '../types'
 import { cn } from '../lib/cn'
 
 export function ProjectDetailPage() {
@@ -18,50 +28,28 @@ export function ProjectDetailPage() {
   const spaceId = Number(spaceIdParam)
   const projectId = Number(projectIdParam)
   const navigate = useNavigate()
-  const token = useAuthStore((s) => s.token)
+  const queryClient = useQueryClient()
 
-  const [project, setProject] = useState<SpaceProject | null>(null)
-  const [stages, setStages] = useState<ProjectStage[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const projectQuery = useProjectQuery(spaceId, projectId)
+  const boardQuery = useProjectBoardQuery(spaceId, projectId)
+  const createTask = useCreateTaskMutation(spaceId, projectId)
+  const updateTask = useUpdateTaskMutation(spaceId, projectId)
+  const deleteTask = useDeleteTaskMutation(spaceId, projectId)
+  const createStage = useCreateStageMutation(spaceId, projectId)
+  const updateStage = useUpdateStageMutation(spaceId, projectId)
+  const deleteStage = useDeleteStageMutation(spaceId, projectId)
+
+  const project = projectQuery.data ?? null
+  const stages = boardQuery.data?.stages ?? []
+  const loading = (projectQuery.isLoading || boardQuery.isLoading) && !project
+  const error =
+    projectQuery.error || boardQuery.error
+      ? ((projectQuery.error || boardQuery.error) as Error).message
+      : null
+
   const [taskDrawerOpen, setTaskDrawerOpen] = useState(false)
   const [taskStageId, setTaskStageId] = useState<number | null>(null)
   const [editingTask, setEditingTask] = useState<ProjectTask | null>(null)
-  const [taskSubmitting, setTaskSubmitting] = useState(false)
-
-  const load = useCallback(async () => {
-    if (!token || !Number.isFinite(spaceId) || !Number.isFinite(projectId)) return
-    setLoading(true)
-    setError(null)
-    try {
-      const [projectData, board] = await Promise.all([
-        spacesApi.getProject(token, spaceId, projectId),
-        spacesApi.getProjectBoard(token, spaceId, projectId),
-      ])
-      setProject(projectData)
-      setStages(board.stages)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load project')
-      setProject(null)
-      setStages([])
-    } finally {
-      setLoading(false)
-    }
-  }, [token, spaceId, projectId])
-
-  useEffect(() => {
-    void load()
-  }, [load])
-
-  function applyBoard(board: ProjectBoard) {
-    setStages(board.stages)
-  }
-
-  async function refreshBoard() {
-    if (!token) return
-    const board = await spacesApi.getProjectBoard(token, spaceId, projectId)
-    applyBoard(board)
-  }
 
   function openCreateTask(stageId: number) {
     setEditingTask(null)
@@ -81,92 +69,69 @@ export function ProjectDetailPage() {
     setTaskStageId(null)
   }
 
+  function handleStagesChange(next: ProjectStage[]) {
+    setBoardStages(queryClient, spaceId, projectId, next)
+  }
+
   async function handleSaveTask(payload: TaskFormPayload) {
-    if (!token) return
-    setTaskSubmitting(true)
     try {
       if (editingTask) {
-        const updated = await spacesApi.updateTask(token, spaceId, projectId, editingTask.id, {
-          title: payload.title,
-          description: payload.description,
-          stage_id: payload.stage_id,
-          assignee_id: payload.assignee_id,
-        })
-        setStages((prev) => {
-          const cleared = prev.map((stage) => ({
-            ...stage,
-            tasks: stage.tasks.filter((task) => task.id !== updated.id),
-          }))
-          return cleared.map((stage) =>
-            stage.id === updated.stage_id
-              ? { ...stage, tasks: [...stage.tasks, updated] }
-              : stage,
-          )
+        const updated = await updateTask.mutateAsync({
+          taskId: editingTask.id,
+          payload: {
+            title: payload.title,
+            description: payload.description,
+            stage_id: payload.stage_id,
+            assignee_id: payload.assignee_id,
+          },
         })
         toast.success('Task updated', updated.title)
       } else {
-        const created = await spacesApi.createTask(token, spaceId, projectId, {
+        const created = await createTask.mutateAsync({
           title: payload.title,
           description: payload.description,
           stage_id: payload.stage_id,
           assignee_id: payload.assignee_id,
         })
-        setStages((prev) =>
-          prev.map((stage) =>
-            stage.id === created.stage_id
-              ? { ...stage, tasks: [...stage.tasks, created] }
-              : stage,
-          ),
-        )
         toast.success('Task created', created.title)
       }
       closeTaskDrawer()
-    } finally {
-      setTaskSubmitting(false)
+    } catch (err) {
+      toast.error('Failed to save task', err instanceof Error ? err.message : undefined)
     }
   }
 
   async function handleMoveTask(taskId: number, stageId: number, position: number) {
-    if (!token) return
     try {
-      await spacesApi.updateTask(token, spaceId, projectId, taskId, {
-        stage_id: stageId,
-        position,
+      await updateTask.mutateAsync({
+        taskId,
+        payload: { stage_id: stageId, position },
       })
     } catch (err) {
       toast.error('Failed to move task', err instanceof Error ? err.message : undefined)
-      await refreshBoard()
+      void boardQuery.refetch()
     }
   }
 
   async function handleDeleteTask(taskId: number) {
-    if (!token) return
     if (!window.confirm('Delete this task?')) return
-    await spacesApi.deleteTask(token, spaceId, projectId, taskId)
-    setStages((prev) =>
-      prev.map((stage) => ({
-        ...stage,
-        tasks: stage.tasks.filter((task) => task.id !== taskId),
-      })),
-    )
-    toast.success('Task deleted')
+    try {
+      await deleteTask.mutateAsync(taskId)
+      toast.success('Task deleted')
+    } catch (err) {
+      toast.error('Failed to delete task', err instanceof Error ? err.message : undefined)
+    }
   }
 
   async function handleRenameStage(stageId: number, name: string) {
-    if (!token) return
-    const updated = await spacesApi.updateStage(token, spaceId, projectId, stageId, { name })
-    setStages((prev) =>
-      prev.map((stage) => (stage.id === stageId ? { ...stage, name: updated.name } : stage)),
-    )
+    const updated = await updateStage.mutateAsync({ stageId, payload: { name } })
     toast.success('Stage renamed', updated.name)
   }
 
   async function handleDeleteStage(stageId: number) {
-    if (!token) return
     if (!window.confirm('Delete this stage? It must be empty.')) return
     try {
-      await spacesApi.deleteStage(token, spaceId, projectId, stageId)
-      setStages((prev) => prev.filter((stage) => stage.id !== stageId))
+      await deleteStage.mutateAsync(stageId)
       toast.success('Stage deleted')
     } catch (err) {
       toast.error('Failed to delete stage', err instanceof Error ? err.message : undefined)
@@ -174,9 +139,7 @@ export function ProjectDetailPage() {
   }
 
   async function handleAddStage(name: string) {
-    if (!token) return
-    const created = await spacesApi.createStage(token, spaceId, projectId, { name })
-    setStages((prev) => [...prev, { ...created, tasks: created.tasks || [] }])
+    const created = await createStage.mutateAsync({ name })
     toast.success('Stage created', created.name)
   }
 
@@ -184,7 +147,7 @@ export function ProjectDetailPage() {
     return <Alert>Invalid project.</Alert>
   }
 
-  if (loading && !project) {
+  if (loading) {
     return <ProjectDetailSkeleton />
   }
 
@@ -253,7 +216,7 @@ export function ProjectDetailPage() {
 
         <KanbanBoard
           stages={stages}
-          onStagesChange={setStages}
+          onStagesChange={handleStagesChange}
           onAddTask={openCreateTask}
           onEditTask={openEditTask}
           onMoveTask={handleMoveTask}
@@ -270,7 +233,7 @@ export function ProjectDetailPage() {
         members={people}
         initialStageId={taskStageId}
         editing={editingTask}
-        submitting={taskSubmitting}
+        submitting={createTask.isPending || updateTask.isPending}
         onClose={closeTaskDrawer}
         onSubmit={handleSaveTask}
       />

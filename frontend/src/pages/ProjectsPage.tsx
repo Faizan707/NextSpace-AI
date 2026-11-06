@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import * as workApi from '../api/work'
 import {
   Alert,
   Badge,
@@ -9,6 +8,7 @@ import {
   formatTableDate,
 } from '../components/ui'
 import type { BadgeTone, DataTableColumn } from '../components/ui'
+import { useWorkProjectsQuery } from '../hooks'
 import { useAuthStore } from '../stores/authStore'
 import type { ProjectStatus, WorkProject } from '../types'
 
@@ -20,24 +20,8 @@ const statusMeta: Record<ProjectStatus, { tone: BadgeTone; label: string }> = {
 
 export function ProjectsPage() {
   const navigate = useNavigate()
-  const token = useAuthStore((s) => s.token)
   const user = useAuthStore((s) => s.user)
-  const [projects, setProjects] = useState<WorkProject[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!token) return
-    setLoading(true)
-    setError(null)
-    workApi
-      .listWorkProjects(token)
-      .then(setProjects)
-      .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : 'Failed to load projects')
-      })
-      .finally(() => setLoading(false))
-  }, [token])
+  const { data: projects = [], isLoading, error } = useWorkProjectsQuery()
 
   const columns = useMemo<DataTableColumn<WorkProject>[]>(
     () => [
@@ -149,14 +133,18 @@ export function ProjectsPage() {
         </Button>
       </section>
 
-      {error ? <Alert className="mb-4">{error}</Alert> : null}
+      {error ? (
+        <Alert className="mb-4">
+          {error instanceof Error ? error.message : 'Failed to load projects'}
+        </Alert>
+      ) : null}
 
       <div className="fade-up-delay overflow-hidden rounded-[20px] border border-line bg-surface shadow-sm">
         <DataTable
           columns={columns}
           data={projects}
           getRowId={(project) => project.id}
-          loading={loading}
+          loading={isLoading}
           emptyMessage="No projects to show."
           defaultSortId="created"
           defaultSortDir="desc"

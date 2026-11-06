@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { FiPlus, FiSearch } from 'react-icons/fi'
-import * as adminApi from '../../api/admin'
 import type { AdminMember } from '../../api/admin'
 import { EditMemberDrawer } from '../../components/EditMemberDrawer'
 import { InviteUserDrawer } from '../../components/InviteUserDrawer'
@@ -13,6 +12,14 @@ import {
   InviteListSkeleton,
 } from '../../components/ui'
 import type { BadgeTone, DataTableColumn } from '../../components/ui'
+import {
+  useAdminInvitesQuery,
+  useAdminOverviewQuery,
+  useCreateInviteMutation,
+  useRevokeInviteMutation,
+  useRevokeUserAccessMutation,
+  useUpdateAdminUserMutation,
+} from '../../hooks'
 import { useAuthStore } from '../../stores/authStore'
 import type { InviteCreateResult, InviteRecord } from '../../types'
 
@@ -33,12 +40,18 @@ function roleLabel(role: string) {
 }
 
 export function AdminUsersPage() {
-  const token = useAuthStore((s) => s.token)
   const currentUser = useAuthStore((s) => s.user)
+  const overviewQuery = useAdminOverviewQuery()
+  const invitesQuery = useAdminInvitesQuery()
+  const createInvite = useCreateInviteMutation()
+  const revokeInvite = useRevokeInviteMutation()
+  const updateUser = useUpdateAdminUserMutation()
+  const revokeUser = useRevokeUserAccessMutation()
 
-  const [users, setUsers] = useState<AdminMember[]>([])
-  const [invites, setInvites] = useState<InviteRecord[]>([])
-  const [loading, setLoading] = useState(true)
+  const users = overviewQuery.data?.users ?? []
+  const invites = invitesQuery.data ?? []
+  const loading = overviewQuery.isLoading || invitesQuery.isLoading
+
   const [error, setError] = useState<string | null>(null)
   const [drawerError, setDrawerError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -47,32 +60,7 @@ export function AdminUsersPage() {
   const [query, setQuery] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editingMember, setEditingMember] = useState<AdminMember | null>(null)
-  const [submitting, setSubmitting] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
-  const [revokingInviteId, setRevokingInviteId] = useState<number | null>(null)
-  const [revokingUserId, setRevokingUserId] = useState<number | null>(null)
-
-  async function load() {
-    if (!token) return
-    setLoading(true)
-    setError(null)
-    try {
-      const [overview, inviteList] = await Promise.all([
-        adminApi.getOverview(token),
-        adminApi.listInvites(token),
-      ])
-      setUsers(overview.users)
-      setInvites(inviteList)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load users')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    void load()
-  }, [token])
 
   const pendingInvites = useMemo(
     () => invites.filter((invite) => invite.status === 'pending'),
@@ -90,19 +78,22 @@ export function AdminUsersPage() {
     })
   }, [users, query])
 
+  const loadError =
+    error ||
+    (overviewQuery.error instanceof Error ? overviewQuery.error.message : null) ||
+    (invitesQuery.error instanceof Error ? invitesQuery.error.message : null)
+
   async function handleInvite(payload: {
     email: string
     full_name?: string
     job_role?: string
     send_password: boolean
   }) {
-    if (!token) return
-    setSubmitting(true)
     setDrawerError(null)
     setSuccess(null)
     setLastInvite(null)
     try {
-      const result = await adminApi.createInvite(token, payload)
+      const result = await createInvite.mutateAsync(payload)
       setLastInvite(result)
       setSuccess(
         payload.send_password
@@ -110,28 +101,20 @@ export function AdminUsersPage() {
           : 'Invite sent. They can sign up via the invite link.',
       )
       setDrawerOpen(false)
-      await load()
     } catch (err) {
       setDrawerError(err instanceof Error ? err.message : 'Invite failed')
-    } finally {
-      setSubmitting(false)
     }
   }
 
   async function handleRevokeInvite(invite: InviteRecord) {
-    if (!token) return
     if (!window.confirm(`Revoke invite for ${invite.email}? The link will stop working.`)) return
-    setRevokingInviteId(invite.id)
     setError(null)
     setSuccess(null)
     try {
-      await adminApi.revokeInvite(token, invite.id)
+      await revokeInvite.mutateAsync(invite.id)
       setSuccess(`Invite revoked for ${invite.email}.`)
-      await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to revoke invite')
-    } finally {
-      setRevokingInviteId(null)
     }
   }
 
@@ -139,24 +122,19 @@ export function AdminUsersPage() {
     full_name?: string | null
     job_role?: string | null
   }) {
-    if (!token || !editingMember) return
-    setSubmitting(true)
+    if (!editingMember) return
     setEditError(null)
     setSuccess(null)
     try {
-      await adminApi.updateUser(token, editingMember.id, payload)
+      await updateUser.mutateAsync({ userId: editingMember.id, payload })
       setSuccess(`Updated ${payload.full_name || editingMember.email}.`)
       setEditingMember(null)
-      await load()
     } catch (err) {
       setEditError(err instanceof Error ? err.message : 'Failed to update member')
-    } finally {
-      setSubmitting(false)
     }
   }
 
   async function handleRevokeUser(user: AdminMember) {
-    if (!token) return
     if (
       !window.confirm(
         `Revoke access for ${user.full_name || user.email}? They will be removed from the organization.`,
@@ -164,17 +142,13 @@ export function AdminUsersPage() {
     ) {
       return
     }
-    setRevokingUserId(user.id)
     setError(null)
     setSuccess(null)
     try {
-      await adminApi.revokeUserAccess(token, user.id)
+      await revokeUser.mutateAsync(user.id)
       setSuccess(`Access revoked for ${user.full_name || user.email}.`)
-      await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to revoke access')
-    } finally {
-      setRevokingUserId(null)
     }
   }
 
@@ -247,10 +221,12 @@ export function AdminUsersPage() {
                   type="button"
                   variant="ghost"
                   className="h-8 rounded-lg px-3 text-xs font-semibold text-danger hover:bg-danger-soft hover:text-danger"
-                  disabled={revokingUserId === user.id}
+                  disabled={revokeUser.isPending && revokeUser.variables === user.id}
                   onClick={() => void handleRevokeUser(user)}
                 >
-                  {revokingUserId === user.id ? 'Revoking…' : 'Revoke'}
+                  {revokeUser.isPending && revokeUser.variables === user.id
+                    ? 'Revoking…'
+                    : 'Revoke'}
                 </Button>
               ) : null}
             </div>
@@ -258,8 +234,11 @@ export function AdminUsersPage() {
         },
       },
     ],
-    [currentUser?.id, revokingUserId],
+    [currentUser?.id, revokeUser.isPending, revokeUser.variables],
   )
+
+  const submitting =
+    createInvite.isPending || updateUser.isPending
 
   return (
     <div className="mx-auto max-w-[1100px] space-y-5">
@@ -279,7 +258,7 @@ export function AdminUsersPage() {
         </Button>
       </section>
 
-      {error ? <Alert>{error}</Alert> : null}
+      {loadError ? <Alert>{loadError}</Alert> : null}
       {success ? (
         <div className="rounded-[var(--radius-control)] border border-accent/20 bg-accent-soft px-4 py-3 text-sm text-accent">
           {success}
@@ -331,10 +310,10 @@ export function AdminUsersPage() {
                       type="button"
                       variant="ghost"
                       className="h-8 rounded-lg px-3 text-xs font-semibold text-danger hover:bg-danger-soft hover:text-danger"
-                      disabled={revokingInviteId === invite.id}
+                      disabled={revokeInvite.isPending && revokeInvite.variables === invite.id}
                       onClick={() => void handleRevokeInvite(invite)}
                     >
-                      {revokingInviteId === invite.id ? '…' : 'Revoke'}
+                      {revokeInvite.isPending && revokeInvite.variables === invite.id ? '…' : 'Revoke'}
                     </Button>
                   </div>
                 </div>
@@ -380,7 +359,7 @@ export function AdminUsersPage() {
       <EditMemberDrawer
         open={Boolean(editingMember)}
         member={editingMember}
-        submitting={submitting}
+        submitting={updateUser.isPending}
         error={editError}
         onClose={() => {
           setEditingMember(null)

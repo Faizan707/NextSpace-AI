@@ -24,6 +24,35 @@ def ensure_default_stages(db: Session, project_id: int) -> None:
     db.flush()
 
 
+def stage_progress_weight(stage_name: str) -> int:
+    """Todo = 0%, Done/Complete = 100%, all other stages = 50%."""
+    key = stage_name.strip().lower()
+    if key == "todo":
+        return 0
+    if key in {"done", "complete", "completed"}:
+        return 100
+    return 50
+
+
+def recalculate_project_progress(db: Session, project_id: int) -> int:
+    """Average task weights from their Kanban stages; no tasks → 0%."""
+    rows = db.execute(
+        select(ProjectStage.name)
+        .join(ProjectTask, ProjectTask.stage_id == ProjectStage.id)
+        .where(ProjectTask.project_id == project_id)
+    ).all()
+    if not rows:
+        progress = 0
+    else:
+        total = sum(stage_progress_weight(name) for (name,) in rows)
+        progress = int(round(total / len(rows)))
+
+    project = db.get(Project, project_id)
+    if project is not None:
+        project.progress = progress
+    return progress
+
+
 def board_query(project_id: int):
     return (
         select(ProjectStage)
@@ -113,4 +142,5 @@ def backfill_project_stages(db: Session) -> None:
     projects = list(db.scalars(select(Project.id)).all())
     for project_id in projects:
         ensure_default_stages(db, project_id)
+        recalculate_project_progress(db, project_id)
     db.commit()

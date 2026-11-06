@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import * as companiesApi from '../api/companies'
-import { useAuthStore } from '../stores/authStore'
-import type { CompanyMember, Space } from '../types'
+import { useCompanyMembersQuery } from '../hooks'
+import type { Space } from '../types'
 import { Alert, Button, Drawer } from './ui'
 import { Avatar } from './Avatar'
 import { cn } from '../lib/cn'
@@ -21,11 +20,9 @@ export function AddSpaceMembersDrawer({
   onClose,
   onSubmit,
 }: AddSpaceMembersDrawerProps) {
-  const token = useAuthStore((s) => s.token)
-  const [members, setMembers] = useState<CompanyMember[]>([])
+  const membersQuery = useCompanyMembersQuery(open)
+  const members = membersQuery.data ?? []
   const [selected, setSelected] = useState<Set<number>>(new Set())
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const existingIds = useMemo(
     () => new Set((space?.members || []).map((member) => member.id)),
@@ -38,18 +35,9 @@ export function AddSpaceMembersDrawer({
   )
 
   useEffect(() => {
-    if (!open || !token) return
+    if (!open) return
     setSelected(new Set())
-    setError(null)
-    setLoading(true)
-    companiesApi
-      .listCompanyMembers(token)
-      .then(setMembers)
-      .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : 'Failed to load company members')
-      })
-      .finally(() => setLoading(false))
-  }, [open, token])
+  }, [open, space?.id])
 
   function toggle(userId: number) {
     setSelected((prev) => {
@@ -64,6 +52,9 @@ export function AddSpaceMembersDrawer({
     if (selected.size === 0) return
     await onSubmit([...selected])
   }
+
+  const error =
+    membersQuery.error instanceof Error ? membersQuery.error.message : null
 
   return (
     <Drawer
@@ -90,8 +81,10 @@ export function AddSpaceMembersDrawer({
     >
       <div className="grid gap-3">
         {error ? <Alert>{error}</Alert> : null}
-        {loading ? <p className="text-sm text-muted">Loading company members…</p> : null}
-        {!loading && candidates.length === 0 ? (
+        {membersQuery.isLoading ? (
+          <p className="text-sm text-muted">Loading company members…</p>
+        ) : null}
+        {!membersQuery.isLoading && candidates.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-line bg-surface-2 px-4 py-8 text-center text-sm text-muted">
             All company members are already in this space.
           </p>

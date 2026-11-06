@@ -18,7 +18,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { FiMenu, FiPlus, FiTrash2 } from 'react-icons/fi'
+import { FiPlus } from 'react-icons/fi'
 import { Avatar } from '../Avatar'
 import { Button, ContextMenu, controlClass } from '../ui'
 import type { ProjectStage, ProjectTask } from '../../types'
@@ -37,6 +37,16 @@ interface KanbanBoardProps {
   onAddStage: (name: string) => Promise<void>
 }
 
+function DragGrip() {
+  return (
+    <span className="grid grid-cols-2 gap-0.5" aria-hidden>
+      {Array.from({ length: 6 }, (_, index) => (
+        <span key={index} className="size-1 rounded-full bg-current opacity-50" />
+      ))}
+    </span>
+  )
+}
+
 function TaskCard({
   task,
   dragging,
@@ -51,63 +61,105 @@ function TaskCard({
   onDelete?: () => void
 }) {
   return (
-    <div
+    <article
       className={cn(
-        'rounded-2xl border border-line bg-surface p-3 shadow-sm',
-        dragging && 'shadow-[var(--shadow-panel)] ring-2 ring-accent/30',
+        'group relative overflow-hidden rounded-[20px] border border-line bg-surface',
+        'shadow-[0_8px_22px_rgba(15,23,42,0.05)] transition duration-200',
+        'hover:-translate-y-0.5 hover:shadow-[var(--shadow-panel)]',
+        dragging && 'scale-[1.02] shadow-[var(--shadow-panel)] ring-2 ring-teal/25',
       )}
     >
-      <div className="flex items-start gap-2">
+      <div className="absolute inset-y-3 left-0 w-1 rounded-full bg-teal/70 opacity-0 transition group-hover:opacity-100" />
+
+      <div className="flex items-start gap-1 px-3.5 pt-3.5">
         {dragHandleProps ? (
           <button
             type="button"
             title="Drag task"
             aria-label={`Drag ${task.title}`}
-            className="mt-0.5 grid size-7 shrink-0 cursor-grab place-items-center rounded-full text-muted transition hover:bg-bg-elevated hover:text-ink active:cursor-grabbing"
+            className="mt-0.5 grid size-7 shrink-0 cursor-grab place-items-center rounded-lg text-muted/70 transition hover:bg-surface-2 hover:text-ink active:cursor-grabbing"
             {...dragHandleProps}
           >
-            <FiMenu size={14} aria-hidden />
+            <DragGrip />
           </button>
-        ) : null}
+        ) : (
+          <span className="mt-0.5 grid size-7 shrink-0 place-items-center text-muted/50">
+            <DragGrip />
+          </span>
+        )}
+
         <button
           type="button"
           onClick={onEdit}
-          className="min-w-0 flex-1 cursor-pointer text-left"
+          className="min-w-0 flex-1 cursor-pointer py-0.5 text-left"
         >
-          <p className="m-0 text-sm font-semibold leading-snug text-ink">{task.title}</p>
-          {task.description ? (
-            <p className="mt-1.5 m-0 line-clamp-2 text-xs text-muted">{task.description}</p>
-          ) : null}
+          <h4 className="m-0 line-clamp-2 font-display text-[0.95rem] font-bold leading-snug text-ink">
+            {task.title}
+          </h4>
+        </button>
+
+        {onDelete ? (
+          <ContextMenu
+            align="end"
+            trigger={({ open, props }) => (
+              <button
+                {...props}
+                aria-label={`Task actions for ${task.title}`}
+                className={cn(
+                  'grid size-7 shrink-0 cursor-pointer place-items-center rounded-lg text-muted transition hover:bg-surface-2 hover:text-ink',
+                  open && 'bg-surface-2 text-ink',
+                )}
+              >
+                <MoreIcon />
+              </button>
+            )}
+            items={[
+              {
+                id: 'edit',
+                label: 'Edit',
+                onSelect: () => onEdit?.(),
+              },
+              {
+                id: 'delete',
+                label: 'Delete',
+                danger: true,
+                onSelect: () => onDelete(),
+              },
+            ]}
+          />
+        ) : null}
+      </div>
+
+      <button
+        type="button"
+        onClick={onEdit}
+        className="block w-full cursor-pointer px-3.5 pb-3.5 text-left"
+      >
+        {task.description ? (
+          <p className="mt-1.5 m-0 line-clamp-2 pl-8 text-xs leading-relaxed text-muted">
+            {task.description}
+          </p>
+        ) : null}
+
+        <div className="mt-3 ml-8 overflow-hidden rounded-xl bg-surface-2">
           {task.assignee ? (
-            <div className="mt-3 flex items-center gap-2">
+            <div className="flex items-center gap-2 px-2.5 py-2">
               <Avatar
                 name={task.assignee.full_name}
                 email={task.assignee.email}
                 imageUrl={task.assignee.avatar_url}
-                className="size-7 text-[0.65rem]"
+                className="size-6 text-[0.6rem]"
               />
-              <span className="truncate text-xs text-muted">
+              <span className="truncate text-xs font-medium text-ink">
                 {task.assignee.full_name || task.assignee.email}
               </span>
             </div>
-          ) : null}
-        </button>
-        {onDelete ? (
-          <button
-            type="button"
-            title="Delete task"
-            aria-label={`Delete ${task.title}`}
-            onClick={(event) => {
-              event.stopPropagation()
-              onDelete()
-            }}
-            className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-muted transition hover:bg-danger-soft hover:text-danger"
-          >
-            <FiTrash2 size={13} aria-hidden />
-          </button>
-        ) : null}
-      </div>
-    </div>
+          ) : (
+            <div className="px-2.5 py-2 text-xs font-medium text-muted">Unassigned</div>
+          )}
+        </div>
+      </button>
+    </article>
   )
 }
 
@@ -189,11 +241,11 @@ function StageColumn({
   return (
     <div
       className={cn(
-        'flex w-[280px] shrink-0 flex-col rounded-[22px] border border-line bg-bg-elevated/60',
-        isOver && 'border-accent/40 bg-accent-soft/30',
+        'flex w-[300px] shrink-0 flex-col rounded-[24px] border border-line bg-bg-elevated/50',
+        isOver && 'border-teal/35 bg-teal-soft/25',
       )}
     >
-      <div className="flex items-start justify-between gap-2 px-3.5 pt-3.5">
+      <div className="flex items-start justify-between gap-2 px-4 pt-4">
         <div className="min-w-0 flex-1">
           {renaming ? (
             <input
@@ -212,6 +264,7 @@ function StageColumn({
                 }
               }}
               autoFocus
+              disabled={busy}
               className={cn(controlClass, '!py-1.5 text-sm font-semibold')}
             />
           ) : (
@@ -261,7 +314,7 @@ function StageColumn({
         />
       </div>
 
-      <div ref={setNodeRef} className="flex min-h-[120px] flex-1 flex-col gap-2.5 p-3">
+      <div ref={setNodeRef} className="flex min-h-[120px] flex-1 flex-col gap-3 p-3.5">
         <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
           {stage.tasks.map((task) => (
             <SortableTask
@@ -276,7 +329,7 @@ function StageColumn({
         <button
           type="button"
           onClick={() => onAddTask(stage.id)}
-          className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-dashed border-line px-3 py-2 text-sm font-semibold text-muted transition hover:border-accent hover:text-accent"
+          className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-2xl border border-dashed border-line px-3 py-2.5 text-sm font-semibold text-muted transition hover:border-teal hover:bg-surface hover:text-teal"
         >
           <FiPlus size={14} aria-hidden />
           Add task

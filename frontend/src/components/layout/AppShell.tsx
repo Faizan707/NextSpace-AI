@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useCompanyQuery, useSpacesQuery } from '../../hooks'
 import { useAuthStore } from '../../stores/authStore'
-import { useCompanyStore } from '../../stores/companyStore'
-import { useSpaceStore } from '../../stores/spaceStore'
 import { cn } from '../../lib/cn'
 import { UserMenu } from './UserMenu'
 
@@ -19,16 +18,15 @@ export function AppShell() {
   const token = useAuthStore((s) => s.token)
   const fetchMe = useAuthStore((s) => s.fetchMe)
   const logout = useAuthStore((s) => s.logout)
-  const fetchCompany = useCompanyStore((s) => s.fetchCompany)
-  const fetchSpaces = useSpaceStore((s) => s.fetchSpaces)
+  // Warm cache for common routes while shell is mounted
+  useSpacesQuery()
+  useCompanyQuery()
   const [mobileNav, setMobileNav] = useState(false)
 
   useEffect(() => {
     if (!token) return
     void fetchMe()
-    void fetchCompany()
-    void fetchSpaces()
-  }, [token, fetchMe, fetchCompany, fetchSpaces])
+  }, [token, fetchMe])
 
   const firstName = user?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'there'
 

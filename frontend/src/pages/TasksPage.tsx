@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import * as workApi from '../api/work'
 import {
   Alert,
   Badge,
@@ -9,6 +8,7 @@ import {
   formatTableDate,
 } from '../components/ui'
 import type { BadgeTone, DataTableColumn } from '../components/ui'
+import { useWorkTasksQuery } from '../hooks'
 import { useAuthStore } from '../stores/authStore'
 import type { WorkTask } from '../types'
 
@@ -22,24 +22,8 @@ function stageTone(name: string): BadgeTone {
 
 export function TasksPage() {
   const navigate = useNavigate()
-  const token = useAuthStore((s) => s.token)
   const user = useAuthStore((s) => s.user)
-  const [tasks, setTasks] = useState<WorkTask[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!token) return
-    setLoading(true)
-    setError(null)
-    workApi
-      .listWorkTasks(token)
-      .then(setTasks)
-      .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : 'Failed to load tasks')
-      })
-      .finally(() => setLoading(false))
-  }, [token])
+  const { data: tasks = [], isLoading, error } = useWorkTasksQuery()
 
   const columns = useMemo<DataTableColumn<WorkTask>[]>(
     () => [
@@ -137,14 +121,18 @@ export function TasksPage() {
         </Button>
       </section>
 
-      {error ? <Alert className="mb-4">{error}</Alert> : null}
+      {error ? (
+        <Alert className="mb-4">
+          {error instanceof Error ? error.message : 'Failed to load tasks'}
+        </Alert>
+      ) : null}
 
       <div className="fade-up-delay overflow-hidden rounded-[20px] border border-line bg-surface shadow-sm">
         <DataTable
           columns={columns}
           data={tasks}
           getRowId={(task) => task.id}
-          loading={loading}
+          loading={isLoading}
           emptyMessage="No tasks to show."
           defaultSortId="updated"
           defaultSortDir="desc"

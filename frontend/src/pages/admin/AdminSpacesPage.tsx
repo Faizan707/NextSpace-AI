@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { FiTrash2 } from 'react-icons/fi'
-import * as adminApi from '../../api/admin'
 import {
   Alert,
   Badge,
@@ -10,8 +9,7 @@ import {
   formatTableDate,
 } from '../../components/ui'
 import type { BadgeTone, DataTableColumn } from '../../components/ui'
-import { useAuthStore } from '../../stores/authStore'
-import { useSpaceStore } from '../../stores/spaceStore'
+import { useAdminOverviewQuery, useDeleteSpaceMutation } from '../../hooks'
 import type { Space, SpaceType } from '../../types'
 
 const typeMeta: Record<SpaceType, { tone: BadgeTone; label: string }> = {
@@ -29,37 +27,24 @@ function TrashIcon() {
 }
 
 export function AdminSpacesPage() {
-  const token = useAuthStore((s) => s.token)
-  const deleteSpace = useSpaceStore((s) => s.deleteSpace)
-  const [spaces, setSpaces] = useState<Space[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [deletingId, setDeletingId] = useState<number | null>(null)
+  const overviewQuery = useAdminOverviewQuery()
+  const deleteSpace = useDeleteSpaceMutation()
+  const spaces = overviewQuery.data?.spaces ?? []
+  const loading = overviewQuery.isLoading
+  const [localError, setLocalError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!token) return
-    setLoading(true)
-    setError(null)
-    adminApi
-      .getOverview(token)
-      .then((overview) => setSpaces(overview.spaces))
-      .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : 'Failed to load spaces')
-      })
-      .finally(() => setLoading(false))
-  }, [token])
+  const error =
+    localError ||
+    (overviewQuery.error instanceof Error ? overviewQuery.error.message : null) ||
+    (deleteSpace.error instanceof Error ? deleteSpace.error.message : null)
 
   async function handleDelete(space: Space) {
     if (!window.confirm(`Delete "${space.name}"? This cannot be undone.`)) return
-    setDeletingId(space.id)
-    setError(null)
+    setLocalError(null)
     try {
-      await deleteSpace(space.id)
-      setSpaces((prev) => prev.filter((item) => item.id !== space.id))
+      await deleteSpace.mutateAsync(space.id)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete space')
-    } finally {
-      setDeletingId(null)
+      setLocalError(err instanceof Error ? err.message : 'Failed to delete space')
     }
   }
 
@@ -128,7 +113,7 @@ export function AdminSpacesPage() {
               size="icon"
               aria-label={`Delete ${space.name}`}
               title="Delete space"
-              disabled={deletingId === space.id}
+              disabled={deleteSpace.isPending && deleteSpace.variables === space.id}
               onClick={() => void handleDelete(space)}
             >
               <TrashIcon />
@@ -137,7 +122,7 @@ export function AdminSpacesPage() {
         ),
       },
     ],
-    [deletingId],
+    [deleteSpace.isPending, deleteSpace.variables],
   )
 
   return (

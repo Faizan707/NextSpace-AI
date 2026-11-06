@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import * as spacesApi from '../api/spaces'
@@ -18,11 +18,25 @@ import {
   SpaceDetailSkeleton,
   Textarea,
 } from '../components/ui'
+import {
+  useAddProjectMembersMutation,
+  useAddTeamMembersMutation,
+  useCreateProjectMutation,
+  useCreateTeamMutation,
+  useDeleteDocumentMutation,
+  useDeleteProjectMutation,
+  useDeleteTeamMutation,
+  useSpaceDocumentsQuery,
+  useSpaceProjectsQuery,
+  useSpaceQuery,
+  useSpaceTeamsQuery,
+  useUpdateProjectMutation,
+  useUploadDocumentMutation,
+} from '../hooks'
 import { useAuthStore } from '../stores/authStore'
 import { toast } from '../stores/toastStore'
 import type {
   ProjectStatus,
-  Space,
   SpaceCreator,
   SpaceDocument,
   SpaceProject,
@@ -57,12 +71,36 @@ export function SpaceDetailPage() {
   const token = useAuthStore((s) => s.token)
   const currentUser = useAuthStore((s) => s.user)
 
-  const [space, setSpace] = useState<Space | null>(null)
-  const [projects, setProjects] = useState<SpaceProject[]>([])
-  const [teams, setTeams] = useState<SpaceTeam[]>([])
-  const [documents, setDocuments] = useState<SpaceDocument[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const spaceQuery = useSpaceQuery(spaceId)
+  const projectsQuery = useSpaceProjectsQuery(spaceId)
+  const teamsQuery = useSpaceTeamsQuery(spaceId)
+  const documentsQuery = useSpaceDocumentsQuery(spaceId)
+
+  const createProject = useCreateProjectMutation(spaceId)
+  const updateProject = useUpdateProjectMutation(spaceId)
+  const deleteProject = useDeleteProjectMutation(spaceId)
+  const addProjectMembers = useAddProjectMembersMutation(spaceId)
+  const createTeam = useCreateTeamMutation(spaceId)
+  const deleteTeam = useDeleteTeamMutation(spaceId)
+  const addTeamMembers = useAddTeamMembersMutation(spaceId)
+  const uploadDocument = useUploadDocumentMutation(spaceId)
+  const deleteDocument = useDeleteDocumentMutation(spaceId)
+
+  const space = spaceQuery.data ?? null
+  const projects = projectsQuery.data ?? []
+  const teams = teamsQuery.data ?? []
+  const documents = documentsQuery.data ?? []
+  const loading =
+    (spaceQuery.isLoading ||
+      projectsQuery.isLoading ||
+      teamsQuery.isLoading ||
+      documentsQuery.isLoading) &&
+    !space
+  const error = spaceQuery.error
+    ? spaceQuery.error instanceof Error
+      ? spaceQuery.error.message
+      : 'Failed to load space'
+    : null
 
   const [projectOpen, setProjectOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<SpaceProject | null>(null)
@@ -70,13 +108,11 @@ export function SpaceDetailPage() {
   const [docOpen, setDocOpen] = useState(false)
   const [membersProject, setMembersProject] = useState<SpaceProject | null>(null)
   const [membersTeam, setMembersTeam] = useState<SpaceTeam | null>(null)
-  const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
   const [projectName, setProjectName] = useState('')
   const [projectDescription, setProjectDescription] = useState('')
   const [projectStatus, setProjectStatus] = useState<ProjectStatus>('open')
-  const [projectProgress, setProjectProgress] = useState(0)
   const [projectDeadline, setProjectDeadline] = useState<Date | undefined>(undefined)
   const [teamName, setTeamName] = useState('')
   const [teamDescription, setTeamDescription] = useState('')
@@ -89,32 +125,16 @@ export function SpaceDetailPage() {
   const [membersOpen, setMembersOpen] = useState(false)
   const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null)
 
-  async function loadAll() {
-    if (!token || !Number.isFinite(spaceId)) return
-    setLoading(true)
-    setError(null)
-    try {
-      const [spaceData, projectData, teamData, documentData] = await Promise.all([
-        spacesApi.getSpace(token, spaceId),
-        spacesApi.listProjects(token, spaceId),
-        spacesApi.listTeams(token, spaceId),
-        spacesApi.listDocuments(token, spaceId),
-      ])
-      setSpace(spaceData)
-      setProjects(projectData)
-      setTeams(teamData)
-      setDocuments(documentData)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load space')
-      setSpace(null)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    void loadAll()
-  }, [token, spaceId])
+  const submitting =
+    createProject.isPending ||
+    updateProject.isPending ||
+    deleteProject.isPending ||
+    addProjectMembers.isPending ||
+    createTeam.isPending ||
+    deleteTeam.isPending ||
+    addTeamMembers.isPending ||
+    uploadDocument.isPending ||
+    deleteDocument.isPending
 
   const selectableMembers = useMemo(
     () => (space?.members || []).filter((member) => member.id !== currentUser?.id),
@@ -141,7 +161,6 @@ export function SpaceDetailPage() {
     setProjectName('')
     setProjectDescription('')
     setProjectStatus('open')
-    setProjectProgress(0)
     setProjectDeadline(undefined)
     setEditingProject(null)
   }
@@ -157,7 +176,6 @@ export function SpaceDetailPage() {
     setProjectName(project.name)
     setProjectDescription(project.description || '')
     setProjectStatus(project.status || 'open')
-    setProjectProgress(project.progress ?? 0)
     setProjectDeadline(parseDeadline(project.deadline))
     setFormError(null)
     setProjectOpen(true)
@@ -165,27 +183,22 @@ export function SpaceDetailPage() {
 
   async function handleSaveProject(event: FormEvent) {
     event.preventDefault()
-    if (!token) return
-    setSubmitting(true)
     setFormError(null)
     try {
       const payload = {
         name: projectName,
         description: projectDescription || null,
         status: projectStatus,
-        progress: projectProgress,
         deadline: deadlineToIso(projectDeadline),
       }
       if (editingProject) {
-        const updated = await spacesApi.updateProject(token, spaceId, editingProject.id, payload)
-        setProjects((prev) => prev.map((item) => (item.id === updated.id ? updated : item)))
+        const updated = await updateProject.mutateAsync({
+          projectId: editingProject.id,
+          payload,
+        })
         toast.success('Project updated', updated.name)
       } else {
-        const created = await spacesApi.createProject(token, spaceId, payload)
-        setProjects((prev) => [created, ...prev])
-        setSpace((prev) =>
-          prev ? { ...prev, projects_count: (prev.projects_count ?? 0) + 1 } : prev,
-        )
+        const created = await createProject.mutateAsync(payload)
         toast.success('Project created', created.name)
       }
       setProjectOpen(false)
@@ -198,47 +211,33 @@ export function SpaceDetailPage() {
             ? 'Failed to update project'
             : 'Failed to create project',
       )
-    } finally {
-      setSubmitting(false)
     }
   }
 
   async function handleAddProjectMembers() {
-    if (!token || !membersProject || projectAddSelected.size === 0) return
-    setSubmitting(true)
+    if (!membersProject || projectAddSelected.size === 0) return
     setFormError(null)
     try {
-      const updated = await spacesApi.addProjectMembers(
-        token,
-        spaceId,
-        membersProject.id,
-        [...projectAddSelected],
-      )
-      setProjects((prev) => prev.map((project) => (project.id === updated.id ? updated : project)))
+      await addProjectMembers.mutateAsync({
+        projectId: membersProject.id,
+        userIds: [...projectAddSelected],
+      })
       setMembersProject(null)
       setProjectAddSelected(new Set())
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to add members')
-    } finally {
-      setSubmitting(false)
     }
   }
 
   async function handleCreateTeam(event: FormEvent) {
     event.preventDefault()
-    if (!token) return
-    setSubmitting(true)
     setFormError(null)
     try {
-      const created = await spacesApi.createTeam(token, spaceId, {
+      const created = await createTeam.mutateAsync({
         name: teamName,
         description: teamDescription || null,
         member_ids: [...selectedMembers],
       })
-      setTeams((prev) => [created, ...prev])
-      setSpace((prev) =>
-        prev ? { ...prev, teams_count: (prev.teams_count ?? 0) + 1 } : prev,
-      )
       setTeamOpen(false)
       setTeamName('')
       setTeamDescription('')
@@ -246,23 +245,19 @@ export function SpaceDetailPage() {
       toast.success('Team created', created.name)
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to create team')
-    } finally {
-      setSubmitting(false)
     }
   }
 
   async function handleUploadDocument(event: FormEvent) {
     event.preventDefault()
-    if (!token || !uploadFile) return
-    setSubmitting(true)
+    if (!uploadFile) return
     setFormError(null)
     setUploadProgress(0)
     try {
-      const created = await spacesApi.uploadDocument(token, spaceId, uploadFile, setUploadProgress)
-      setDocuments((prev) => [created, ...prev])
-      setSpace((prev) =>
-        prev ? { ...prev, documents_count: (prev.documents_count ?? 0) + 1 } : prev,
-      )
+      const created = await uploadDocument.mutateAsync({
+        file: uploadFile,
+        onProgress: setUploadProgress,
+      })
       setDocOpen(false)
       setUploadFile(null)
       setUploadProgress(0)
@@ -270,51 +265,37 @@ export function SpaceDetailPage() {
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to upload document')
       toast.error('Upload failed', err instanceof Error ? err.message : undefined)
-    } finally {
-      setSubmitting(false)
     }
   }
 
   async function handleAddTeamMembers() {
-    if (!token || !membersTeam || teamAddSelected.size === 0) return
-    setSubmitting(true)
+    if (!membersTeam || teamAddSelected.size === 0) return
     setFormError(null)
     try {
-      const updated = await spacesApi.addTeamMembers(
-        token,
-        spaceId,
-        membersTeam.id,
-        [...teamAddSelected],
-      )
-      setTeams((prev) => prev.map((team) => (team.id === updated.id ? updated : team)))
+      await addTeamMembers.mutateAsync({
+        teamId: membersTeam.id,
+        userIds: [...teamAddSelected],
+      })
       setMembersTeam(null)
       setTeamAddSelected(new Set())
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to add members')
-    } finally {
-      setSubmitting(false)
     }
   }
 
   async function handleDeleteProject(project: SpaceProject) {
-    if (!token) return
     if (!window.confirm('Delete this project?')) return
-    await spacesApi.deleteProject(token, spaceId, project.id)
-    setProjects((prev) => prev.filter((item) => item.id !== project.id))
+    await deleteProject.mutateAsync(project.id)
   }
 
   async function handleDeleteTeam(team: SpaceTeam) {
-    if (!token) return
     if (!window.confirm('Delete this team?')) return
-    await spacesApi.deleteTeam(token, spaceId, team.id)
-    setTeams((prev) => prev.filter((item) => item.id !== team.id))
+    await deleteTeam.mutateAsync(team.id)
   }
 
   async function handleDeleteDocument(document: SpaceDocument) {
-    if (!token) return
     if (!window.confirm('Delete this document?')) return
-    await spacesApi.deleteDocument(token, spaceId, document.id)
-    setDocuments((prev) => prev.filter((item) => item.id !== document.id))
+    await deleteDocument.mutateAsync(document.id)
   }
 
   async function handleDownload(document: SpaceDocument) {
@@ -323,7 +304,7 @@ export function SpaceDetailPage() {
       headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) {
-      setError('Download failed')
+      toast.error('Download failed')
       return
     }
     const blob = await response.blob()
@@ -549,16 +530,10 @@ export function SpaceDetailPage() {
             onChange={(value) => setProjectStatus(value as ProjectStatus)}
             options={PROJECT_STATUS_OPTIONS}
           />
-          <Input
-            id="project-progress"
-            label="Progress (%)"
-            type="number"
-            min={0}
-            max={100}
-            value={projectProgress}
-            onChange={(e) => setProjectProgress(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
-            hint="0 to 100"
-          />
+          <p className="text-sm text-muted">
+            Progress updates automatically from the Kanban board (Todo 0%, other stages 50%, Done
+            100%).
+          </p>
           <DeadlinePicker
             value={projectDeadline}
             onChange={setProjectDeadline}

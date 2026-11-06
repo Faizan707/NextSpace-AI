@@ -1,14 +1,13 @@
 import { CompanyPageSkeleton } from '../components/ui'
+import { useCompanyQuery } from '../hooks'
 import { useAuthStore } from '../stores/authStore'
-import { useCompanyStore } from '../stores/companyStore'
 
 export function CompanyPage() {
   const user = useAuthStore((s) => s.user)
-  const company = useCompanyStore((s) => s.company)
-  const loading = useCompanyStore((s) => s.loading)
+  const { data: company, isLoading } = useCompanyQuery()
   const display = company ?? user?.company
 
-  if (loading && !display) {
+  if (isLoading && !display) {
     return (
       <div className="mx-auto max-w-3xl">
         <CompanyPageSkeleton />

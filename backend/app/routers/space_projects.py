@@ -89,7 +89,7 @@ def create_project(
         name=payload.name.strip(),
         description=payload.description,
         status=payload.status,
-        progress=payload.progress,
+        progress=0,
         deadline=payload.deadline,
         created_by_id=current_user.id,
     )
@@ -119,6 +119,8 @@ def update_project(
     project = _get_project_in_space(db, space_id, project_id)
 
     for field, value in payload.model_dump(exclude_unset=True).items():
+        if field == "progress":
+            continue  # Derived from Kanban stages
         if field == "name" and isinstance(value, str):
             value = value.strip()
         setattr(project, field, value)
