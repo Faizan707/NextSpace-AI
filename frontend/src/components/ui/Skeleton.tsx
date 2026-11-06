@@ -122,3 +122,43 @@ export function UsersTableSkeleton({ rows = 5 }: { rows?: number }) {
     </div>
   )
 }
+
+function SpaceDetailSectionSkeleton({ cardCount = 3 }: { cardCount?: number }) {
+  return (
+    <section>
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div className="space-y-2">
+          <Skeleton className="h-6 w-28 rounded-md" />
+          <SkeletonText className="h-3.5 w-52" />
+        </div>
+        <Skeleton className="h-11 w-36 rounded-full" />
+      </div>
+      <div className="flex flex-wrap gap-4">
+        {Array.from({ length: cardCount }, (_, i) => (
+          <SpaceCardSkeleton key={i} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/** Full space detail page placeholder (header + projects/teams/docs cards). */
+export function SpaceDetailSkeleton() {
+  return (
+    <div className="mx-auto max-w-7xl space-y-8" aria-busy="true" aria-label="Loading space">
+      <section className="fade-up">
+        <Skeleton className="h-4 w-28 rounded-md" />
+        <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1 space-y-3">
+            <Skeleton className="h-9 w-64 max-w-full rounded-lg" />
+            <SkeletonText className="h-4 w-80 max-w-full" />
+          </div>
+          <Skeleton className="h-7 w-20 rounded-full" />
+        </div>
+      </section>
+      <SpaceDetailSectionSkeleton cardCount={3} />
+      <SpaceDetailSectionSkeleton cardCount={2} />
+      <SpaceDetailSectionSkeleton cardCount={2} />
+    </div>
+  )
+}

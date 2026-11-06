@@ -7,7 +7,7 @@ from app.database import get_db
 from app.models.space_member import SpaceMember
 from app.models.team import Team, TeamMember
 from app.models.user import User
-from app.schemas.space import SpaceCreatorRead
+from app.schemas.space import SpaceCreatorRead, SpaceMembersAdd
 from app.schemas.team import TeamCreate, TeamRead, TeamUpdate
 from app.services.space_access import get_accessible_space
 
@@ -114,6 +114,37 @@ def update_team(
         if field == "name" and isinstance(value, str):
             value = value.strip()
         setattr(team, field, value)
+
+    db.commit()
+    updated = db.scalar(_team_query().where(Team.id == team.id))
+    return _to_read(updated)
+
+
+@router.post("/{space_id}/teams/{team_id}/members", response_model=TeamRead)
+def add_team_members(
+    space_id: int,
+    team_id: int,
+    payload: SpaceMembersAdd,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TeamRead:
+    space = get_accessible_space(db, space_id, current_user)
+    team = _get_team_in_space(db, space_id, team_id)
+    space_member_ids = {membership.user_id for membership in space.memberships}
+    existing = {membership.user_id for membership in team.memberships}
+
+    invalid = [user_id for user_id in payload.user_ids if user_id not in space_member_ids]
+    if invalid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Team members must already belong to this space",
+        )
+
+    for user_id in payload.user_ids:
+        if user_id in existing:
+            continue
+        db.add(TeamMember(team_id=team.id, user_id=user_id))
+        existing.add(user_id)
 
     db.commit()
     updated = db.scalar(_team_query().where(Team.id == team.id))

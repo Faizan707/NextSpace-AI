@@ -65,12 +65,51 @@ export function listProjects(token: string, spaceId: number) {
 export function createProject(
   token: string,
   spaceId: number,
-  payload: { name: string; description?: string | null },
+  payload: {
+    name: string
+    description?: string | null
+    status?: SpaceProject['status']
+    progress?: number
+    deadline?: string | null
+    member_ids?: number[]
+  },
 ) {
   return apiRequest<SpaceProject>(`/spaces/${spaceId}/projects`, {
     method: 'POST',
     token,
     body: payload,
+  })
+}
+
+export function updateProject(
+  token: string,
+  spaceId: number,
+  projectId: number,
+  payload: {
+    name?: string
+    description?: string | null
+    status?: SpaceProject['status']
+    progress?: number
+    deadline?: string | null
+  },
+) {
+  return apiRequest<SpaceProject>(`/spaces/${spaceId}/projects/${projectId}`, {
+    method: 'PATCH',
+    token,
+    body: payload,
+  })
+}
+
+export function addProjectMembers(
+  token: string,
+  spaceId: number,
+  projectId: number,
+  userIds: number[],
+) {
+  return apiRequest<SpaceProject>(`/spaces/${spaceId}/projects/${projectId}/members`, {
+    method: 'POST',
+    token,
+    body: { user_ids: userIds },
   })
 }
 
@@ -101,6 +140,19 @@ export function deleteTeam(token: string, spaceId: number, teamId: number) {
   return apiRequest<void>(`/spaces/${spaceId}/teams/${teamId}`, {
     method: 'DELETE',
     token,
+  })
+}
+
+export function addTeamMembers(
+  token: string,
+  spaceId: number,
+  teamId: number,
+  userIds: number[],
+) {
+  return apiRequest<SpaceTeam>(`/spaces/${spaceId}/teams/${teamId}/members`, {
+    method: 'POST',
+    token,
+    body: { user_ids: userIds },
   })
 }
 

@@ -1,0 +1,24 @@
+---
+description: Clickable UI must use shared Button and always show cursor pointer
+globs: frontend/**/*.{tsx,ts,jsx,js,css}
+alwaysApply: false
+---
+
+# Frontend clickables
+
+When adding or changing any clickable control in the frontend:
+
+- Use `Button` from `frontend/src/components/ui` (or `buttonClasses` for `Link`-styled actions).
+- Do **not** use raw `<button>` for UI actions — that skips shared styles like `cursor-pointer`.
+- For icon-only controls (edit/delete/add), use `size="icon"`.
+- Default size is `md` (filled pill). Prefer existing variants: `primary`, `secondary`, `ghost`, `danger`.
+
+## Cursor pointer (required)
+
+Anything the user can click/tap must show `cursor: pointer` on hover:
+
+- Buttons, links, icon actions, tabs, cards with `onClick` / `role="link"` / `role="button"`
+- Menu items, checkboxes/radio labels that act as controls
+- Disabled controls use `cursor-not-allowed` (never pointer)
+
+If a custom clickable cannot use `Button`, add `cursor-pointer` (or ensure the global clickable base styles cover it). Never leave interactive elements on the default arrow cursor.

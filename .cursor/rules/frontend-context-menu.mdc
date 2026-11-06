@@ -1,0 +1,16 @@
+---
+description: Always use our custom ContextMenu UI — never native browser menus/selects
+globs: frontend/**/*.{tsx,ts,jsx,js}
+alwaysApply: false
+---
+
+# Frontend context menus & selects
+
+For any dropdown, overflow menu, status picker, or action menu in the frontend:
+
+- Use `ContextMenu` from `frontend/src/components/ui` for action menus (edit / delete / add…).
+- Use `Select` from `frontend/src/components/ui` for single-value pickers (status, type, etc.).
+- Both are custom UI. Do **not** use native `<select>`, browser `<option>` lists, or OS context menus for product UI.
+- Do **not** invent a one-off absolute-positioned menu when `ContextMenu` already covers it.
+- Menu items must use `cursor-pointer` (built into `ContextMenu` / `Select`).
+- Keep styling on our design tokens: `border-line`, `bg-surface`, `rounded-2xl`, `shadow-[var(--shadow-panel)]`.

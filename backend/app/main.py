@@ -5,13 +5,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.database import Base, engine
-from sqlalchemy import select
+from sqlalchemy import inspect, select, text
 
 from app.models import (  # noqa: F401
     Company,
     Document,
     Invite,
     Project,
+    ProjectMember,
     Space,
     SpaceMember,
     Team,
@@ -42,10 +43,55 @@ def _backfill_space_memberships() -> None:
         db.close()
 
 
+def _ensure_project_columns() -> None:
+    """Add newer project columns for databases created before they existed."""
+    inspector = inspect(engine)
+    if "projects" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("projects")}
+    statements: list[str] = []
+    if "deadline" not in columns:
+        statements.append("ALTER TABLE projects ADD COLUMN deadline TIMESTAMP WITH TIME ZONE")
+    if "status" not in columns:
+        statements.append(
+            "ALTER TABLE projects ADD COLUMN status VARCHAR(32) NOT NULL DEFAULT 'open'"
+        )
+    if "progress" not in columns:
+        statements.append("ALTER TABLE projects ADD COLUMN progress INTEGER NOT NULL DEFAULT 0")
+    if not statements:
+        return
+    with engine.begin() as conn:
+        for statement in statements:
+            conn.execute(text(statement))
+
+
+def _backfill_project_memberships() -> None:
+    """Ensure existing projects include their creator as a member."""
+    from app.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        projects = list(db.scalars(select(Project)).all())
+        for project in projects:
+            exists = db.scalar(
+                select(ProjectMember.id).where(
+                    ProjectMember.project_id == project.id,
+                    ProjectMember.user_id == project.created_by_id,
+                )
+            )
+            if exists is None:
+                db.add(ProjectMember(project_id=project.id, user_id=project.created_by_id))
+        db.commit()
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
+    _ensure_project_columns()
     _backfill_space_memberships()
+    _backfill_project_memberships()
     yield
 
 

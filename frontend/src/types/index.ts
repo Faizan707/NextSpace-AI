@@ -104,13 +104,19 @@ export interface InvitePublic {
   status: string
 }
 
+export type ProjectStatus = 'open' | 'in_progress' | 'completed'
+
 export interface SpaceProject {
   id: number
   space_id: number
   name: string
   description: string | null
+  status: ProjectStatus
+  progress: number
+  deadline: string | null
   created_by_id: number
   created_by: SpaceCreator
+  members: SpaceCreator[]
   created_at: string
 }
 
