@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes } from 'react'
 import { cn } from '../../lib/cn'
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
-export type ButtonSize = 'md' | 'icon'
+export type ButtonSize = 'sm' | 'md' | 'icon'
 
 const base =
   'inline-flex cursor-pointer items-center justify-center gap-2 rounded-full font-semibold transition duration-160 ease-out disabled:cursor-not-allowed disabled:opacity-55'
@@ -17,6 +17,7 @@ const variants: Record<ButtonVariant, string> = {
 }
 
 const sizes: Record<ButtonSize, string> = {
+  sm: 'px-3.5 py-2 text-sm',
   md: 'px-6 py-3.5 text-[0.95rem]',
   icon: 'size-9 shrink-0 p-0 text-sm',
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Alert, Button, Drawer, Input } from './ui'
+import { CUSTOM_JOB_ROLE_VALUE, JOB_ROLE_OPTIONS, jobRoleSelectValue } from '../lib/jobRoles'
+import { Alert, Button, Drawer, Input, Select } from './ui'
 
 interface InviteUserDrawerProps {
   open: boolean
@@ -10,6 +11,7 @@ interface InviteUserDrawerProps {
   onSubmit: (payload: {
     email: string
     full_name?: string
+    job_role?: string
     send_password: boolean
   }) => Promise<void>
 }
@@ -23,20 +25,30 @@ export function InviteUserDrawer({
 }: InviteUserDrawerProps) {
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
+  const [jobRole, setJobRole] = useState('')
+  const [customJobRole, setCustomJobRole] = useState('')
   const [sendPassword, setSendPassword] = useState(false)
 
   useEffect(() => {
     if (!open) return
     setEmail('')
     setFullName('')
+    setJobRole('')
+    setCustomJobRole('')
     setSendPassword(false)
   }, [open])
 
+  const selectValue = jobRoleSelectValue(jobRole)
+  const showCustom = selectValue === CUSTOM_JOB_ROLE_VALUE
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const resolvedRole =
+      selectValue === CUSTOM_JOB_ROLE_VALUE ? customJobRole.trim() : jobRole.trim()
     await onSubmit({
       email,
       full_name: fullName || undefined,
+      job_role: resolvedRole || undefined,
       send_password: sendPassword,
     })
   }
@@ -68,6 +80,38 @@ export function InviteUserDrawer({
           onChange={(e) => setEmail(e.target.value)}
           placeholder="member@company.com"
         />
+
+        <Select
+          id="invite-job-role"
+          label="Job role"
+          value={selectValue}
+          onChange={(value) => {
+            if (value === CUSTOM_JOB_ROLE_VALUE) {
+              setJobRole(CUSTOM_JOB_ROLE_VALUE)
+              return
+            }
+            setJobRole(value)
+            setCustomJobRole('')
+          }}
+          options={[
+            { value: '', label: 'Select role…' },
+            ...JOB_ROLE_OPTIONS.map((option) => ({
+              value: option.value,
+              label: option.label,
+            })),
+          ]}
+          hint="What they do on the team — e.g. Frontend Engineer."
+        />
+        {showCustom ? (
+          <Input
+            id="invite-job-role-custom"
+            label="Custom job role"
+            required
+            value={customJobRole}
+            onChange={(e) => setCustomJobRole(e.target.value)}
+            placeholder="e.g. Mobile Engineer"
+          />
+        ) : null}
 
         <div className="grid gap-3">
           <p className="text-sm font-medium text-ink/80">Invite method</p>

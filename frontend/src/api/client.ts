@@ -71,32 +71,62 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   return (await response.json()) as T
 }
 
+export type UploadProgressHandler = (percent: number) => void
+
 export async function apiUpload<T>(
   path: string,
   file: File,
   token?: string | null,
   fieldName = 'file',
+  onProgress?: UploadProgressHandler,
 ): Promise<T> {
-  const headers = new Headers()
-  if (token) headers.set('Authorization', `Bearer ${token}`)
-
   const body = new FormData()
   body.append(fieldName, file)
 
-  const response = await fetch(`${API_URL}${path}`, {
-    method: 'POST',
-    headers,
-    body,
-  })
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `${API_URL}${path}`)
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
 
-  if (!response.ok) {
-    if (response.status === 401 && token) {
-      onUnauthorized?.()
+    xhr.upload.onprogress = (event) => {
+      if (!onProgress) return
+      if (!event.lengthComputable || event.total <= 0) {
+        onProgress(0)
+        return
+      }
+      onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)))
     }
-    throw new ApiError(response.status, await parseError(response))
-  }
 
-  return (await response.json()) as T
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress?.(100)
+        try {
+          resolve(JSON.parse(xhr.responseText) as T)
+        } catch {
+          reject(new ApiError(xhr.status, 'Invalid upload response'))
+        }
+        return
+      }
+
+      if (xhr.status === 401 && token) {
+        onUnauthorized?.()
+      }
+
+      let message = xhr.statusText || 'Upload failed'
+      try {
+        const data = JSON.parse(xhr.responseText) as { detail?: string | { msg?: string }[] }
+        if (typeof data.detail === 'string') message = data.detail
+        else if (Array.isArray(data.detail) && data.detail[0]?.msg) message = data.detail[0].msg
+      } catch {
+        /* ignore */
+      }
+      reject(new ApiError(xhr.status, message))
+    }
+
+    xhr.onerror = () => reject(new ApiError(0, 'Network error during upload'))
+    xhr.onabort = () => reject(new ApiError(0, 'Upload cancelled'))
+    xhr.send(body)
+  })
 }
 
 export function apiDownloadUrl(path: string) {

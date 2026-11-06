@@ -13,28 +13,11 @@ from app.models.invite import Invite, InviteStatus
 from app.models.space import Space
 from app.models.space_member import SpaceMember
 from app.models.user import User, UserRole
-from app.schemas.admin import AdminOverview, MemberRead
+from app.schemas.admin import AdminOverview, MemberRead, MemberUpdate
 from app.schemas.invite import InviteCreate, InviteCreateResult, InviteRead
-from app.schemas.space import SpaceCreatorRead, SpaceRead
+from app.schemas.space import SpaceRead
 from app.services.email import send_email
-
-
-def _space_to_read(space: Space) -> SpaceRead:
-    return SpaceRead(
-        id=space.id,
-        name=space.name,
-        description=space.description,
-        space_type=space.space_type,
-        company_id=space.company_id,
-        created_by_id=space.created_by_id,
-        created_by=SpaceCreatorRead.model_validate(space.created_by),
-        members=[
-            SpaceCreatorRead.model_validate(membership.user)
-            for membership in space.memberships
-            if membership.user is not None
-        ],
-        created_at=space.created_at,
-    )
+from app.services.space_access import to_space_reads
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -65,7 +48,7 @@ def admin_overview(
             .order_by(Space.created_at.desc())
         ).all()
     )
-    return AdminOverview(users=users, spaces=[_space_to_read(space) for space in spaces])
+    return AdminOverview(users=users, spaces=to_space_reads(db, spaces))
 
 
 @router.get("/users", response_model=list[MemberRead])
@@ -94,7 +77,7 @@ def list_org_spaces(
             .order_by(Space.created_at.desc())
         ).all()
     )
-    return [_space_to_read(space) for space in spaces]
+    return to_space_reads(db, spaces)
 
 
 @router.get("/invites", response_model=list[InviteRead])
@@ -134,8 +117,13 @@ def create_invite(
 
     settings = get_settings()
     token = secrets.token_urlsafe(32)
+    job_role = payload.job_role.strip() if payload.job_role else None
+    full_name = payload.full_name.strip() if payload.full_name else None
+
     invite = Invite(
         email=email,
+        full_name=full_name,
+        job_role=job_role,
         token=token,
         status=InviteStatus.PENDING,
         send_password=payload.send_password,
@@ -153,7 +141,8 @@ def create_invite(
         user = User(
             email=email,
             hashed_password=hash_password(temporary_password),
-            full_name=payload.full_name,
+            full_name=full_name,
+            job_role=job_role,
             role=UserRole.MEMBER,
             company_id=current_user.company_id,
         )
@@ -167,9 +156,10 @@ def create_invite(
             to=email,
             subject=f"You're invited to {company_name} on {settings.app_name}",
             body=(
-                f"Hi{f' {payload.full_name}' if payload.full_name else ''},\n\n"
+                f"Hi{f' {full_name}' if full_name else ''},\n\n"
                 f"You have been added to {company_name} on {settings.app_name}.\n\n"
                 f"Email: {email}\n"
+                f"{f'Role: {job_role}\n' if job_role else ''}"
                 f"Temporary password: {temporary_password}\n\n"
                 f"Sign in here: {login_url}\n"
                 "Please change your password after logging in.\n"
@@ -181,8 +171,9 @@ def create_invite(
             to=email,
             subject=f"Invitation to join {company_name} on {settings.app_name}",
             body=(
-                f"Hi{f' {payload.full_name}' if payload.full_name else ''},\n\n"
+                f"Hi{f' {full_name}' if full_name else ''},\n\n"
                 f"You have been invited to join {company_name} on {settings.app_name}.\n\n"
+                f"{f'Role: {job_role}\n\n' if job_role else ''}"
                 f"Accept your invite and set a password here:\n{invite_link}\n"
             ),
         )
@@ -220,6 +211,32 @@ def revoke_invite(
     db.commit()
     db.refresh(invite)
     return invite
+
+
+@router.patch("/users/{user_id}", response_model=MemberRead)
+def update_user(
+    user_id: int,
+    payload: MemberUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_tenant_owner),
+) -> User:
+    target = db.scalar(
+        select(User).where(User.id == user_id, User.company_id == current_user.company_id)
+    )
+    if target is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    data = payload.model_dump(exclude_unset=True)
+    if "full_name" in data:
+        value = data["full_name"]
+        target.full_name = value.strip() if isinstance(value, str) and value.strip() else None
+    if "job_role" in data:
+        value = data["job_role"]
+        target.job_role = value.strip() if isinstance(value, str) and value.strip() else None
+
+    db.commit()
+    db.refresh(target)
+    return target
 
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)

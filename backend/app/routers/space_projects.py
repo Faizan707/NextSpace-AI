@@ -8,6 +8,7 @@ from app.models.project import Project, ProjectMember
 from app.models.user import User
 from app.schemas.project import ProjectCreate, ProjectRead, ProjectUpdate
 from app.schemas.space import SpaceCreatorRead, SpaceMembersAdd
+from app.services.project_board import ensure_default_stages
 from app.services.space_access import get_accessible_space
 
 router = APIRouter(prefix="/spaces", tags=["space-projects"])
@@ -100,6 +101,7 @@ def create_project(
     for user_id in member_ids:
         db.add(ProjectMember(project_id=project.id, user_id=user_id))
 
+    ensure_default_stages(db, project.id)
     db.commit()
     created = db.scalar(_project_query().where(Project.id == project.id))
     return _to_read(created)

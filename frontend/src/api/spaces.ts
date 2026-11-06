@@ -1,5 +1,8 @@
 import { apiDownloadUrl, apiRequest, apiUpload } from './client'
 import type {
+  ProjectBoard,
+  ProjectStage,
+  ProjectTask,
   Space,
   SpaceCreator,
   SpaceDocument,
@@ -120,6 +123,93 @@ export function deleteProject(token: string, spaceId: number, projectId: number)
   })
 }
 
+export function getProject(token: string, spaceId: number, projectId: number) {
+  return apiRequest<SpaceProject>(`/spaces/${spaceId}/projects/${projectId}`, { token })
+}
+
+export function getProjectBoard(token: string, spaceId: number, projectId: number) {
+  return apiRequest<ProjectBoard>(`/spaces/${spaceId}/projects/${projectId}/board`, { token })
+}
+
+export function createStage(
+  token: string,
+  spaceId: number,
+  projectId: number,
+  payload: { name: string },
+) {
+  return apiRequest<ProjectStage>(`/spaces/${spaceId}/projects/${projectId}/stages`, {
+    method: 'POST',
+    token,
+    body: payload,
+  })
+}
+
+export function updateStage(
+  token: string,
+  spaceId: number,
+  projectId: number,
+  stageId: number,
+  payload: { name?: string; position?: number },
+) {
+  return apiRequest<ProjectStage>(`/spaces/${spaceId}/projects/${projectId}/stages/${stageId}`, {
+    method: 'PATCH',
+    token,
+    body: payload,
+  })
+}
+
+export function deleteStage(token: string, spaceId: number, projectId: number, stageId: number) {
+  return apiRequest<void>(`/spaces/${spaceId}/projects/${projectId}/stages/${stageId}`, {
+    method: 'DELETE',
+    token,
+  })
+}
+
+export function createTask(
+  token: string,
+  spaceId: number,
+  projectId: number,
+  payload: {
+    title: string
+    description?: string | null
+    stage_id: number
+    assignee_id?: number | null
+  },
+) {
+  return apiRequest<ProjectTask>(`/spaces/${spaceId}/projects/${projectId}/tasks`, {
+    method: 'POST',
+    token,
+    body: payload,
+  })
+}
+
+export function updateTask(
+  token: string,
+  spaceId: number,
+  projectId: number,
+  taskId: number,
+  payload: {
+    title?: string
+    description?: string | null
+    stage_id?: number
+    position?: number
+    assignee_id?: number | null
+  },
+) {
+  return apiRequest<ProjectTask>(`/spaces/${spaceId}/projects/${projectId}/tasks/${taskId}`, {
+    method: 'PATCH',
+    token,
+    body: payload,
+  })
+}
+
+export function deleteTask(token: string, spaceId: number, projectId: number, taskId: number) {
+  return apiRequest<void>(`/spaces/${spaceId}/projects/${projectId}/tasks/${taskId}`, {
+    method: 'DELETE',
+    token,
+  })
+}
+
 export function listTeams(token: string, spaceId: number) {
   return apiRequest<SpaceTeam[]>(`/spaces/${spaceId}/teams`, { token })
 }
@@ -160,8 +250,13 @@ export function listDocuments(token: string, spaceId: number) {
   return apiRequest<SpaceDocument[]>(`/spaces/${spaceId}/documents`, { token })
 }
 
-export function uploadDocument(token: string, spaceId: number, file: File) {
-  return apiUpload<SpaceDocument>(`/spaces/${spaceId}/documents`, file, token)
+export function uploadDocument(
+  token: string,
+  spaceId: number,
+  file: File,
+  onProgress?: (percent: number) => void,
+) {
+  return apiUpload<SpaceDocument>(`/spaces/${spaceId}/documents`, file, token, 'file', onProgress)
 }
 
 export function deleteDocument(token: string, spaceId: number, documentId: number) {

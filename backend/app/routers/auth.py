@@ -113,7 +113,8 @@ def accept_invite(token: str, payload: InviteAccept, db: Session = Depends(get_d
     user = User(
         email=invite.email,
         hashed_password=hash_password(payload.password),
-        full_name=payload.full_name,
+        full_name=payload.full_name or invite.full_name,
+        job_role=invite.job_role,
         role=UserRole.MEMBER,
         company_id=invite.company_id,
     )

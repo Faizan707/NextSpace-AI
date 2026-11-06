@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import { FiMail } from 'react-icons/fi'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import * as invitesApi from '../api/invites'
 import { Alert, AuthCard, Button, FormSkeleton, Input } from '../components/ui'
@@ -7,14 +8,7 @@ import { useAuthStore } from '../stores/authStore'
 import type { InvitePublic } from '../types'
 
 function InviteIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11Zm2.2.7 5.8 4.2 5.8-4.2-.9-1.2L12 10 7.1 6l-.9 1.2Z"
-        fill="currentColor"
-      />
-    </svg>
-  )
+  return <FiMail size={20} aria-hidden />
 }
 
 export function AcceptInvitePage() {

@@ -1,30 +1,17 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
+import { FiHome, FiUser } from 'react-icons/fi'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { CountrySelect, type CountryOption } from '../components/CountrySelect'
 import { Alert, AuthCard, Button, Input } from '../components/ui'
 import { useAuthStore } from '../stores/authStore'
 
 function UserIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M12 12a4.5 4.5 0 1 0-4.5-4.5A4.5 4.5 0 0 0 12 12Zm0 2.25c-3.6 0-6.75 1.8-6.75 4.05V20h13.5v-1.7c0-2.25-3.15-4.05-6.75-4.05Z"
-        fill="currentColor"
-      />
-    </svg>
-  )
+  return <FiUser size={20} aria-hidden />
 }
 
 function BuildingIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M4 20V9.5L12 4l8 5.5V20h-5.5v-5h-5v5H4Zm2-2h2.5v-5H15v5H17.5V10.3L12 6.4 6.5 10.3V18Z"
-        fill="currentColor"
-      />
-    </svg>
-  )
+  return <FiHome size={20} aria-hidden />
 }
 
 export function RegisterPage() {

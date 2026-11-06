@@ -5,6 +5,7 @@ import { SpaceDrawer } from '../components/SpaceDrawer'
 import { Alert, Button, SpaceCardsSkeleton } from '../components/ui'
 import { useAuthStore } from '../stores/authStore'
 import { useSpaceStore } from '../stores/spaceStore'
+import { toast } from '../stores/toastStore'
 import type { Space, SpacePayload } from '../types'
 
 export function SpacesPage() {
@@ -36,13 +37,22 @@ export function SpacesPage() {
   }
 
   async function handleSave(payload: SpacePayload) {
-    if (editing) {
-      await updateSpace(editing.id, payload)
-    } else {
-      await createSpace(payload)
+    try {
+      if (editing) {
+        await updateSpace(editing.id, payload)
+        toast.success('Space updated', payload.name)
+      } else {
+        await createSpace(payload)
+        toast.success('Space created', payload.name)
+      }
+      setDrawerOpen(false)
+      setEditing(null)
+    } catch (err) {
+      toast.error(
+        editing ? 'Failed to update space' : 'Failed to create space',
+        err instanceof Error ? err.message : undefined,
+      )
     }
-    setDrawerOpen(false)
-    setEditing(null)
   }
 
   async function handleAddMembers(userIds: number[]) {

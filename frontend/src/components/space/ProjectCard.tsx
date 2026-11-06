@@ -2,11 +2,12 @@ import { Avatar } from '../Avatar'
 import { Button, ContextMenu } from '../ui'
 import type { ProjectStatus, SpaceProject } from '../../types'
 import { formatDate } from './format'
-import { PlusIcon } from './icons'
+import { CalendarIcon, MoreIcon, PlusIcon, ProgressIcon } from './icons'
 import { cn } from '../../lib/cn'
 
 interface ProjectCardProps {
   project: SpaceProject
+  onOpen: (project: SpaceProject) => void
   onEdit: (project: SpaceProject) => void
   onAddMembers: (project: SpaceProject) => void
   onDelete: (project: SpaceProject) => void
@@ -47,57 +48,33 @@ function statusMeta(status: ProjectStatus, deadline: string | null) {
   }
 }
 
-function CalendarMiniIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M7 3v2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2V3h-2v2H9V3H7Zm12 6H5v10h14V9Z"
-        fill="currentColor"
-      />
-    </svg>
-  )
-}
-
-function ProgressIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M4 6h16v2H4V6Zm0 5h12v2H4v-2Zm0 5h8v2H4v-2Z" fill="currentColor" />
-    </svg>
-  )
-}
-
-function MoreIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M12 7a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm0 6.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm0 6.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"
-        fill="currentColor"
-      />
-    </svg>
-  )
-}
-
-export function ProjectCard({ project, onEdit, onAddMembers, onDelete }: ProjectCardProps) {
+export function ProjectCard({ project, onOpen, onEdit, onAddMembers, onDelete }: ProjectCardProps) {
   const createdLabel = formatDate(project.created_at) || '—'
   const deadlineLabel = formatDate(project.deadline) || 'Not set'
   const people = project.members?.length > 0 ? project.members : [project.created_by]
   const preview = people.slice(0, 3)
   const extraCount = Math.max(people.length - preview.length, 0)
+  const memberLabel = `${people.length} member${people.length === 1 ? '' : 's'}`
   const status = statusMeta(project.status, project.deadline)
   const progress = Math.max(0, Math.min(100, project.progress ?? 0))
 
   return (
     <article className="relative flex w-[320px] flex-col rounded-[24px] border border-line bg-surface p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] transition hover:shadow-[var(--shadow-panel)]">
       <div className="flex items-start justify-between gap-3">
-        <span
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.72rem] font-semibold',
-            status.className,
-          )}
-        >
-          <span className={cn('size-1.5 rounded-full', status.dotClassName)} />
-          {status.label}
-        </span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.72rem] font-semibold',
+              status.className,
+            )}
+          >
+            <span className={cn('size-1.5 rounded-full', status.dotClassName)} />
+            {status.label}
+          </span>
+          <span className="inline-flex rounded-full bg-accent-soft px-2.5 py-1 text-[0.72rem] font-bold text-accent">
+            {memberLabel}
+          </span>
+        </div>
 
         <ContextMenu
           align="end"
@@ -146,7 +123,7 @@ export function ProjectCard({ project, onEdit, onAddMembers, onDelete }: Project
           <p className="text-[0.65rem] font-bold uppercase tracking-[0.08em] text-muted">Created at</p>
           <p className="mt-1.5 flex items-center gap-1.5 text-sm font-semibold text-ink">
             <span className="text-muted">
-              <CalendarMiniIcon />
+              <CalendarIcon />
             </span>
             {createdLabel}
           </p>
@@ -155,7 +132,7 @@ export function ProjectCard({ project, onEdit, onAddMembers, onDelete }: Project
           <p className="text-[0.65rem] font-bold uppercase tracking-[0.08em] text-muted">Deadline</p>
           <p className="mt-1.5 flex items-center gap-1.5 text-sm font-semibold text-ink">
             <span className="text-muted">
-              <CalendarMiniIcon />
+              <CalendarIcon />
             </span>
             {deadlineLabel}
           </p>
@@ -199,7 +176,7 @@ export function ProjectCard({ project, onEdit, onAddMembers, onDelete }: Project
             type="button"
             variant="secondary"
             size="icon"
-            className="ml-[-6px] border-dashed"
+            className="ml-[-8px] border-dashed"
             aria-label="Add member"
             title="Add member"
             onClick={() => onAddMembers(project)}
@@ -210,7 +187,7 @@ export function ProjectCard({ project, onEdit, onAddMembers, onDelete }: Project
 
         <button
           type="button"
-          onClick={() => onEdit(project)}
+          onClick={() => onOpen(project)}
           className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-ink px-3.5 py-2.5 text-sm font-semibold text-ink-on-accent transition hover:bg-ink/90"
         >
           Details

@@ -5,6 +5,7 @@ import { DocumentCard } from './DocumentCard'
 interface DocumentsSectionProps {
   documents: SpaceDocument[]
   onUpload: () => void
+  onPreview: (document: SpaceDocument) => void
   onDownload: (document: SpaceDocument) => void
   onDelete: (document: SpaceDocument) => void
 }
@@ -12,6 +13,7 @@ interface DocumentsSectionProps {
 export function DocumentsSection({
   documents,
   onUpload,
+  onPreview,
   onDownload,
   onDelete,
 }: DocumentsSectionProps) {
@@ -38,6 +40,7 @@ export function DocumentsSection({
               key={document.id}
               document={document}
               onUploadAnother={onUpload}
+              onPreview={onPreview}
               onDownload={onDownload}
               onDelete={onDelete}
             />

@@ -1,5 +1,6 @@
 import { DayPicker } from 'react-day-picker'
 import { format } from 'date-fns'
+import { FiCalendar } from 'react-icons/fi'
 import { Button } from './Button'
 import { cn } from '../../lib/cn'
 import 'react-day-picker/style.css'
@@ -42,7 +43,7 @@ export function DeadlinePicker({
             </p>
           </div>
           <span className="grid size-10 place-items-center rounded-full bg-accent-soft text-accent">
-            <CalendarIcon />
+            <FiCalendar size={18} aria-hidden />
           </span>
         </div>
 
@@ -57,16 +58,5 @@ export function DeadlinePicker({
         />
       </div>
     </div>
-  )
-}
-
-function CalendarIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M7 3v2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2V3h-2v2H9V3H7Zm12 6H5v10h14V9Z"
-        fill="currentColor"
-      />
-    </svg>
   )
 }

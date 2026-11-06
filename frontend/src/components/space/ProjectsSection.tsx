@@ -5,6 +5,7 @@ import { ProjectCard } from './ProjectCard'
 interface ProjectsSectionProps {
   projects: SpaceProject[]
   onCreate: () => void
+  onOpen: (project: SpaceProject) => void
   onEdit: (project: SpaceProject) => void
   onAddMembers: (project: SpaceProject) => void
   onDelete: (project: SpaceProject) => void
@@ -13,6 +14,7 @@ interface ProjectsSectionProps {
 export function ProjectsSection({
   projects,
   onCreate,
+  onOpen,
   onEdit,
   onAddMembers,
   onDelete,
@@ -39,6 +41,7 @@ export function ProjectsSection({
             <ProjectCard
               key={project.id}
               project={project}
+              onOpen={onOpen}
               onEdit={onEdit}
               onAddMembers={onAddMembers}
               onDelete={onDelete}

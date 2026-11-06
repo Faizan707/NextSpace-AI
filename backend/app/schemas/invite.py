@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 class InviteCreate(BaseModel):
     email: EmailStr
     full_name: str | None = None
+    job_role: str | None = Field(default=None, max_length=255)
     send_password: bool = False
 
 
@@ -14,6 +15,8 @@ class InviteRead(BaseModel):
 
     id: int
     email: EmailStr
+    full_name: str | None = None
+    job_role: str | None = None
     status: str
     send_password: bool
     company_id: int

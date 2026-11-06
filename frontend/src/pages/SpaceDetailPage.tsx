@@ -3,6 +3,8 @@ import type { FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import * as spacesApi from '../api/spaces'
 import { Avatar } from '../components/Avatar'
+import { SpaceMembersDrawer } from '../components/SpaceMembersDrawer'
+import { DocumentPreviewModal } from '../components/space/DocumentPreviewModal'
 import { DocumentsSection } from '../components/space/DocumentsSection'
 import { ProjectsSection } from '../components/space/ProjectsSection'
 import { TeamsSection } from '../components/space/TeamsSection'
@@ -17,7 +19,15 @@ import {
   Textarea,
 } from '../components/ui'
 import { useAuthStore } from '../stores/authStore'
-import type { ProjectStatus, Space, SpaceDocument, SpaceProject, SpaceTeam } from '../types'
+import { toast } from '../stores/toastStore'
+import type {
+  ProjectStatus,
+  Space,
+  SpaceCreator,
+  SpaceDocument,
+  SpaceProject,
+  SpaceTeam,
+} from '../types'
 import { cn } from '../lib/cn'
 
 const PROJECT_STATUS_OPTIONS = [
@@ -74,6 +84,10 @@ export function SpaceDetailPage() {
   const [projectAddSelected, setProjectAddSelected] = useState<Set<number>>(new Set())
   const [teamAddSelected, setTeamAddSelected] = useState<Set<number>>(new Set())
   const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [previewDocument, setPreviewDocument] = useState<SpaceDocument | null>(null)
+  const [membersOpen, setMembersOpen] = useState(false)
+  const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null)
 
   async function loadAll() {
     if (!token || !Number.isFinite(spaceId)) return
@@ -165,9 +179,14 @@ export function SpaceDetailPage() {
       if (editingProject) {
         const updated = await spacesApi.updateProject(token, spaceId, editingProject.id, payload)
         setProjects((prev) => prev.map((item) => (item.id === updated.id ? updated : item)))
+        toast.success('Project updated', updated.name)
       } else {
         const created = await spacesApi.createProject(token, spaceId, payload)
         setProjects((prev) => [created, ...prev])
+        setSpace((prev) =>
+          prev ? { ...prev, projects_count: (prev.projects_count ?? 0) + 1 } : prev,
+        )
+        toast.success('Project created', created.name)
       }
       setProjectOpen(false)
       resetProjectForm()
@@ -217,10 +236,14 @@ export function SpaceDetailPage() {
         member_ids: [...selectedMembers],
       })
       setTeams((prev) => [created, ...prev])
+      setSpace((prev) =>
+        prev ? { ...prev, teams_count: (prev.teams_count ?? 0) + 1 } : prev,
+      )
       setTeamOpen(false)
       setTeamName('')
       setTeamDescription('')
       setSelectedMembers(new Set())
+      toast.success('Team created', created.name)
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to create team')
     } finally {
@@ -233,13 +256,20 @@ export function SpaceDetailPage() {
     if (!token || !uploadFile) return
     setSubmitting(true)
     setFormError(null)
+    setUploadProgress(0)
     try {
-      const created = await spacesApi.uploadDocument(token, spaceId, uploadFile)
+      const created = await spacesApi.uploadDocument(token, spaceId, uploadFile, setUploadProgress)
       setDocuments((prev) => [created, ...prev])
+      setSpace((prev) =>
+        prev ? { ...prev, documents_count: (prev.documents_count ?? 0) + 1 } : prev,
+      )
       setDocOpen(false)
       setUploadFile(null)
+      setUploadProgress(0)
+      toast.success('Document uploaded', created.original_name)
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to upload document')
+      toast.error('Upload failed', err instanceof Error ? err.message : undefined)
     } finally {
       setSubmitting(false)
     }
@@ -351,6 +381,16 @@ export function SpaceDetailPage() {
     )
   }
 
+  const spaceMembers =
+    space.members?.length > 0 ? space.members : space.created_by ? [space.created_by] : []
+  const memberPreview = spaceMembers.slice(0, 4)
+  const memberExtra = Math.max(spaceMembers.length - memberPreview.length, 0)
+
+  function openMembers(member?: SpaceCreator) {
+    setSelectedMemberId(member?.id ?? spaceMembers[0]?.id ?? null)
+    setMembersOpen(true)
+  }
+
   return (
     <div className="mx-auto max-w-7xl space-y-8">
       <section className="fade-up">
@@ -362,17 +402,67 @@ export function SpaceDetailPage() {
             <h1 className="font-display text-3xl font-bold text-ink">{space.name}</h1>
             <p className="mt-1 text-muted">{space.description || 'No description'}</p>
           </div>
-          <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-bold uppercase text-accent">
-            {space.space_type}
-          </span>
+          <div className="flex flex-col items-end gap-2.5">
+            <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-bold uppercase text-accent">
+              {space.space_type}
+            </span>
+            {spaceMembers.length > 0 ? (
+              <div className="flex items-center" aria-label="Space members">
+                {memberPreview.map((member, index) => (
+                  <button
+                    key={member.id}
+                    type="button"
+                    title={member.full_name || member.email}
+                    aria-label={`View ${member.full_name || member.email}`}
+                    onClick={() => openMembers(member)}
+                    className={cn(
+                      'cursor-pointer rounded-full transition hover:z-10 hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+                      index === 0 ? undefined : 'ml-[-8px]',
+                    )}
+                  >
+                    <Avatar
+                      name={member.full_name}
+                      email={member.email}
+                      imageUrl={member.avatar_url}
+                      className="pointer-events-none"
+                    />
+                  </button>
+                ))}
+                {memberExtra > 0 ? (
+                  <button
+                    type="button"
+                    title={`View all ${spaceMembers.length} members`}
+                    aria-label={`View all ${spaceMembers.length} members`}
+                    onClick={() => openMembers()}
+                    className="ml-[-8px] grid size-9 cursor-pointer place-items-center rounded-full bg-bg-elevated text-[0.7rem] font-bold text-muted ring-2 ring-surface transition hover:z-10 hover:scale-110 hover:text-ink"
+                  >
+                    +{memberExtra}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
       </section>
 
       {error ? <Alert>{error}</Alert> : null}
 
+      <SpaceMembersDrawer
+        open={membersOpen}
+        spaceName={space.name}
+        members={spaceMembers}
+        selectedId={selectedMemberId}
+        onSelect={(member) => setSelectedMemberId(member.id)}
+        onClose={() => {
+          setMembersOpen(false)
+          setSelectedMemberId(null)
+        }}
+      />
+
       <ProjectsSection
         projects={projects}
         onCreate={openCreateProject}
+        onOpen={(project) => navigate(`/app/spaces/${spaceId}/projects/${project.id}`)}
         onEdit={openEditProject}
         onAddMembers={(project) => {
           setFormError(null)
@@ -402,8 +492,22 @@ export function SpaceDetailPage() {
           setFormError(null)
           setDocOpen(true)
         }}
+        onPreview={setPreviewDocument}
         onDownload={(document) => void handleDownload(document)}
         onDelete={(document) => void handleDeleteDocument(document)}
+      />
+
+      <DocumentPreviewModal
+        open={Boolean(previewDocument)}
+        file={previewDocument}
+        token={token}
+        downloadUrl={
+          previewDocument
+            ? spacesApi.documentDownloadUrl(spaceId, previewDocument.id)
+            : null
+        }
+        onClose={() => setPreviewDocument(null)}
+        onDownload={(document) => void handleDownload(document)}
       />
 
       <Drawer
@@ -689,7 +793,13 @@ export function SpaceDetailPage() {
         open={docOpen}
         eyebrow="Documents"
         title="Upload document"
-        onClose={() => setDocOpen(false)}
+        onClose={() => {
+          if (submitting) return
+          setDocOpen(false)
+          setUploadFile(null)
+          setUploadProgress(0)
+          setFormError(null)
+        }}
       >
         <form className="flex flex-1 flex-col gap-4" onSubmit={handleUploadDocument}>
           {formError ? <Alert>{formError}</Alert> : null}
@@ -701,17 +811,53 @@ export function SpaceDetailPage() {
               id="document-file"
               type="file"
               required
-              onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-              className="block w-full rounded-[var(--radius-control)] border border-line bg-surface px-4 py-3 text-sm text-ink file:mr-3 file:rounded-full file:border-0 file:bg-accent-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-accent"
+              disabled={submitting}
+              onChange={(e) => {
+                setUploadFile(e.target.files?.[0] || null)
+                setUploadProgress(0)
+              }}
+              className="block w-full rounded-[var(--radius-control)] border border-line bg-surface px-4 py-3 text-sm text-ink file:mr-3 file:rounded-full file:border-0 file:bg-accent-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-accent disabled:cursor-not-allowed disabled:opacity-60"
             />
             <p className="text-xs text-muted">Max 25MB.</p>
           </div>
+
+          {submitting || uploadProgress > 0 ? (
+            <div className="rounded-2xl border border-line bg-bg-elevated/70 px-3.5 py-3">
+              <div className="flex items-center justify-between gap-3 text-xs font-semibold">
+                <span className="text-muted">
+                  {uploadProgress >= 100 ? 'Finishing upload…' : 'Uploading…'}
+                </span>
+                <span className="tabular-nums text-ink">{uploadProgress}%</span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-2">
+                <div
+                  className="h-full rounded-full bg-accent transition-[width] duration-200 ease-out"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+              {uploadFile ? (
+                <p className="mt-2 m-0 truncate text-xs text-muted">{uploadFile.name}</p>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="mt-auto flex gap-3 border-t border-line pt-5">
-            <Button type="button" variant="secondary" className="flex-1" onClick={() => setDocOpen(false)}>
+            <Button
+              type="button"
+              variant="secondary"
+              className="flex-1"
+              disabled={submitting}
+              onClick={() => {
+                setDocOpen(false)
+                setUploadFile(null)
+                setUploadProgress(0)
+                setFormError(null)
+              }}
+            >
               Cancel
             </Button>
             <Button type="submit" className="flex-[1.3]" disabled={submitting || !uploadFile}>
-              {submitting ? 'Uploading…' : 'Upload document'}
+              {submitting ? `Uploading ${uploadProgress}%` : 'Upload document'}
             </Button>
           </div>
         </form>

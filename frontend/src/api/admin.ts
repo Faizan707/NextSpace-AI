@@ -1,7 +1,10 @@
 import { apiRequest } from './client'
 import type { InviteCreatePayload, InviteCreateResult, InviteRecord, Space, User } from '../types'
 
-export type AdminMember = Pick<User, 'id' | 'email' | 'full_name' | 'role' | 'created_at'> & {
+export type AdminMember = Pick<
+  User,
+  'id' | 'email' | 'full_name' | 'job_role' | 'role' | 'created_at'
+> & {
   avatar_url?: string | null
 }
 
@@ -30,6 +33,18 @@ export function revokeInvite(token: string, inviteId: number) {
   return apiRequest<InviteRecord>(`/admin/invites/${inviteId}/revoke`, {
     method: 'POST',
     token,
+  })
+}
+
+export function updateUser(
+  token: string,
+  userId: number,
+  payload: { full_name?: string | null; job_role?: string | null },
+) {
+  return apiRequest<AdminMember>(`/admin/users/${userId}`, {
+    method: 'PATCH',
+    token,
+    body: payload,
   })
 }
 

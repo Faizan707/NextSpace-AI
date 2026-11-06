@@ -23,6 +23,8 @@ class Invite(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(255), index=True)
+    full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    job_role: Mapped[str | None] = mapped_column(String(255), nullable=True)
     token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     status: Mapped[str] = mapped_column(String(50), default=InviteStatus.PENDING, index=True)
     send_password: Mapped[bool] = mapped_column(Boolean, default=False)

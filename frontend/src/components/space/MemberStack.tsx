@@ -43,7 +43,7 @@ export function MemberStack({
           type="button"
           variant="secondary"
           size="icon"
-          className="ml-[-6px] border-dashed"
+          className="ml-[-8px] border-dashed"
           aria-label={addLabel || 'Add'}
           title={addLabel || 'Add'}
           onClick={(event) => {

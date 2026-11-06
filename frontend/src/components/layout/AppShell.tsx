@@ -9,6 +9,8 @@ import { UserMenu } from './UserMenu'
 const navItems = [
   { to: '/app', label: 'Dashboard', end: true, icon: '▦' },
   { to: '/app/spaces', label: 'Spaces', end: false, icon: '◇' },
+  { to: '/app/projects', label: 'Projects', end: false, icon: '▣' },
+  { to: '/app/tasks', label: 'Tasks', end: false, icon: '✓' },
 ]
 
 export function AppShell() {

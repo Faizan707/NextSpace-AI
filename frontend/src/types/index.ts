@@ -13,6 +13,7 @@ export interface User {
   id: number
   email: string
   full_name: string | null
+  job_role: string | null
   role: UserRole
   company_id: number
   company: Company
@@ -23,6 +24,7 @@ export interface SpaceCreator {
   id: number
   email: string
   full_name: string | null
+  job_role?: string | null
   avatar_url: string | null
 }
 
@@ -35,6 +37,9 @@ export interface Space {
   created_by_id: number
   created_by: SpaceCreator
   members: SpaceCreator[]
+  projects_count: number
+  teams_count: number
+  documents_count: number
   created_at: string
 }
 
@@ -42,6 +47,7 @@ export interface CompanyMember {
   id: number
   email: string
   full_name: string | null
+  job_role?: string | null
   avatar_url: string | null
   role: UserRole
   created_at: string
@@ -78,12 +84,15 @@ export interface CompanyUpdatePayload {
 export interface InviteCreatePayload {
   email: string
   full_name?: string
+  job_role?: string
   send_password: boolean
 }
 
 export interface InviteRecord {
   id: number
   email: string
+  full_name?: string | null
+  job_role?: string | null
   status: string
   send_password: boolean
   company_id: number
@@ -140,4 +149,56 @@ export interface SpaceDocument {
   uploaded_by_id: number
   uploaded_by: SpaceCreator
   created_at: string
+}
+
+export interface ProjectTask {
+  id: number
+  project_id: number
+  stage_id: number
+  title: string
+  description: string | null
+  position: number
+  assignee_id: number | null
+  assignee: SpaceCreator | null
+  created_by_id: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ProjectStage {
+  id: number
+  project_id: number
+  name: string
+  position: number
+  is_default: boolean
+  tasks: ProjectTask[]
+  created_at: string
+}
+
+export interface ProjectBoard {
+  project_id: number
+  stages: ProjectStage[]
+}
+
+export interface WorkProject extends SpaceProject {
+  space_name: string
+}
+
+export interface WorkTask {
+  id: number
+  project_id: number
+  project_name: string
+  space_id: number
+  space_name: string
+  stage_id: number
+  stage_name: string
+  title: string
+  description: string | null
+  position: number
+  assignee_id: number | null
+  assignee: SpaceCreator | null
+  created_by_id: number
+  created_by: SpaceCreator
+  created_at: string
+  updated_at: string
 }

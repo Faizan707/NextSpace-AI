@@ -162,3 +162,65 @@ export function SpaceDetailSkeleton() {
     </div>
   )
 }
+
+function KanbanColumnSkeleton({ taskCount = 2 }: { taskCount?: number }) {
+  return (
+    <div className="flex w-[280px] shrink-0 flex-col rounded-[22px] border border-line bg-bg-elevated/60">
+      <div className="flex items-start justify-between gap-2 px-3.5 pt-3.5">
+        <div className="min-w-0 flex-1 space-y-2">
+          <Skeleton className="h-5 w-28 rounded-md" />
+          <Skeleton className="h-3 w-16 rounded-md" />
+        </div>
+        <Skeleton className="size-8 shrink-0 rounded-full" />
+      </div>
+      <div className="flex flex-col gap-2.5 p-3">
+        {Array.from({ length: taskCount }, (_, i) => (
+          <div key={i} className="rounded-2xl border border-line bg-surface p-3">
+            <div className="flex items-start gap-2">
+              <Skeleton className="mt-0.5 size-7 shrink-0 rounded-full" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <SkeletonText className="h-4 w-4/5" />
+                <SkeletonText className="h-3 w-full" />
+                <SkeletonText className="h-3 w-2/3" />
+              </div>
+            </div>
+          </div>
+        ))}
+        <Skeleton className="h-10 w-full rounded-xl" />
+      </div>
+    </div>
+  )
+}
+
+/** Project board page placeholder — Kanban columns, not project cards. */
+export function ProjectDetailSkeleton() {
+  return (
+    <div className="mx-auto max-w-[1400px] space-y-6" aria-busy="true" aria-label="Loading project board">
+      <section className="fade-up">
+        <Skeleton className="h-4 w-28 rounded-md" />
+        <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 flex-1 space-y-3">
+            <Skeleton className="h-3 w-16 rounded-md" />
+            <Skeleton className="h-9 w-72 max-w-full rounded-lg" />
+            <SkeletonText className="h-4 w-80 max-w-full" />
+          </div>
+          <div className="flex -space-x-2">
+            <SkeletonCircle />
+            <SkeletonCircle />
+            <SkeletonCircle />
+          </div>
+        </div>
+      </section>
+      <section>
+        <Skeleton className="mb-2 h-6 w-24 rounded-md" />
+        <SkeletonText className="mb-4 h-4 w-80 max-w-full" />
+        <div className="flex items-start gap-4 overflow-x-auto pb-2">
+          <KanbanColumnSkeleton taskCount={3} />
+          <KanbanColumnSkeleton taskCount={2} />
+          <KanbanColumnSkeleton taskCount={1} />
+          <Skeleton className="h-14 w-[260px] shrink-0 rounded-[22px]" />
+        </div>
+      </section>
+    </div>
+  )
+}

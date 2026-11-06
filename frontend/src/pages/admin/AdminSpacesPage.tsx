@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { FiTrash2 } from 'react-icons/fi'
 import * as adminApi from '../../api/admin'
 import {
   Alert,
@@ -24,14 +25,7 @@ function spaceCode(id: number) {
 }
 
 function TrashIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M7 21a2 2 0 0 1-2-2V7H4V5h4V4h8v1h4v2h-1v12a2 2 0 0 1-2 2H7Zm2-4h2V9H9v8Zm4 0h2V9h-2v8Z"
-        fill="currentColor"
-      />
-    </svg>
-  )
+  return <FiTrash2 size={16} aria-hidden />
 }
 
 export function AdminSpacesPage() {

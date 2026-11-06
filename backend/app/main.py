@@ -13,13 +13,25 @@ from app.models import (  # noqa: F401
     Invite,
     Project,
     ProjectMember,
+    ProjectStage,
+    ProjectTask,
     Space,
     SpaceMember,
     Team,
     TeamMember,
     User,
 )
-from app.routers import admin, auth, companies, space_documents, space_projects, space_teams, spaces
+from app.routers import (
+    admin,
+    auth,
+    companies,
+    project_board,
+    space_documents,
+    space_projects,
+    space_teams,
+    spaces,
+    work,
+)
 
 
 def _backfill_space_memberships() -> None:
@@ -43,26 +55,36 @@ def _backfill_space_memberships() -> None:
         db.close()
 
 
-def _ensure_project_columns() -> None:
-    """Add newer project columns for databases created before they existed."""
+def _ensure_column(table: str, column: str, ddl: str) -> None:
     inspector = inspect(engine)
-    if "projects" not in inspector.get_table_names():
+    if table not in inspector.get_table_names():
         return
-    columns = {column["name"] for column in inspector.get_columns("projects")}
-    statements: list[str] = []
-    if "deadline" not in columns:
-        statements.append("ALTER TABLE projects ADD COLUMN deadline TIMESTAMP WITH TIME ZONE")
-    if "status" not in columns:
-        statements.append(
-            "ALTER TABLE projects ADD COLUMN status VARCHAR(32) NOT NULL DEFAULT 'open'"
-        )
-    if "progress" not in columns:
-        statements.append("ALTER TABLE projects ADD COLUMN progress INTEGER NOT NULL DEFAULT 0")
-    if not statements:
+    columns = {item["name"] for item in inspector.get_columns(table)}
+    if column in columns:
         return
     with engine.begin() as conn:
-        for statement in statements:
-            conn.execute(text(statement))
+        conn.execute(text(ddl))
+
+
+def _ensure_project_columns() -> None:
+    """Add newer project columns for databases created before they existed."""
+    _ensure_column("projects", "deadline", "ALTER TABLE projects ADD COLUMN deadline TIMESTAMP WITH TIME ZONE")
+    _ensure_column(
+        "projects",
+        "status",
+        "ALTER TABLE projects ADD COLUMN status VARCHAR(32) NOT NULL DEFAULT 'open'",
+    )
+    _ensure_column(
+        "projects",
+        "progress",
+        "ALTER TABLE projects ADD COLUMN progress INTEGER NOT NULL DEFAULT 0",
+    )
+
+
+def _ensure_user_job_role_columns() -> None:
+    _ensure_column("users", "job_role", "ALTER TABLE users ADD COLUMN job_role VARCHAR(255)")
+    _ensure_column("invites", "full_name", "ALTER TABLE invites ADD COLUMN full_name VARCHAR(255)")
+    _ensure_column("invites", "job_role", "ALTER TABLE invites ADD COLUMN job_role VARCHAR(255)")
 
 
 def _backfill_project_memberships() -> None:
@@ -86,12 +108,26 @@ def _backfill_project_memberships() -> None:
         db.close()
 
 
+def _backfill_project_stages() -> None:
+    """Ensure every project has default Kanban stages."""
+    from app.database import SessionLocal
+    from app.services.project_board import backfill_project_stages
+
+    db = SessionLocal()
+    try:
+        backfill_project_stages(db)
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
     _ensure_project_columns()
+    _ensure_user_job_role_columns()
     _backfill_space_memberships()
     _backfill_project_memberships()
+    _backfill_project_stages()
     yield
 
 
@@ -116,6 +152,8 @@ app.include_router(admin.router)
 app.include_router(companies.router)
 app.include_router(spaces.router)
 app.include_router(space_projects.router)
+app.include_router(project_board.router)
+app.include_router(work.router)
 app.include_router(space_teams.router)
 app.include_router(space_documents.router)
 

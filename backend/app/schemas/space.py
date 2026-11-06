@@ -23,6 +23,7 @@ class SpaceCreatorRead(BaseModel):
     id: int
     email: EmailStr
     full_name: str | None
+    job_role: str | None = None
     avatar_url: str | None = None
 
 
@@ -37,6 +38,9 @@ class SpaceRead(BaseModel):
     created_by_id: int
     created_by: SpaceCreatorRead
     members: list[SpaceCreatorRead] = []
+    projects_count: int = 0
+    teams_count: int = 0
+    documents_count: int = 0
     created_at: datetime
 
 

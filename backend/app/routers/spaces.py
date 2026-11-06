@@ -13,7 +13,8 @@ from app.services.space_access import (
     get_company_space,
     require_space_access,
     space_query,
-    to_space_read,
+    to_space_read_with_counts,
+    to_space_reads,
 )
 
 router = APIRouter(prefix="/spaces", tags=["spaces"])
@@ -37,7 +38,7 @@ def create_space(
     db.add(SpaceMember(space_id=space.id, user_id=current_user.id))
     db.commit()
     created = db.scalar(space_query().where(Space.id == space.id))
-    return to_space_read(created)
+    return to_space_read_with_counts(db, created)
 
 
 @router.get("", response_model=list[SpaceRead])
@@ -58,7 +59,7 @@ def list_spaces(
         .unique()
         .all()
     )
-    return [to_space_read(space) for space in spaces]
+    return to_space_reads(db, spaces)
 
 
 @router.get("/{space_id}", response_model=SpaceRead)
@@ -69,7 +70,7 @@ def get_space(
 ) -> SpaceRead:
     space = get_company_space(db, space_id, current_user.company_id)
     require_space_access(current_user, space)
-    return to_space_read(space)
+    return to_space_read_with_counts(db, space)
 
 
 @router.patch("/{space_id}", response_model=SpaceRead)
@@ -88,7 +89,7 @@ def update_space(
 
     db.commit()
     updated = db.scalar(space_query().where(Space.id == space.id))
-    return to_space_read(updated)
+    return to_space_read_with_counts(db, updated)
 
 
 @router.delete("/{space_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -154,7 +155,7 @@ def add_space_members(
 
     db.commit()
     updated = db.scalar(space_query().where(Space.id == space.id))
-    return to_space_read(updated)
+    return to_space_read_with_counts(db, updated)
 
 
 @router.delete("/{space_id}/members/{user_id}", response_model=SpaceRead)
@@ -181,4 +182,4 @@ def remove_space_member(
     db.delete(membership)
     db.commit()
     updated = db.scalar(space_query().where(Space.id == space.id))
-    return to_space_read(updated)
+    return to_space_read_with_counts(db, updated)

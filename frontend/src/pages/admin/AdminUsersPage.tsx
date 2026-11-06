@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
+import { FiPlus, FiSearch } from 'react-icons/fi'
 import * as adminApi from '../../api/admin'
 import type { AdminMember } from '../../api/admin'
+import { EditMemberDrawer } from '../../components/EditMemberDrawer'
 import { InviteUserDrawer } from '../../components/InviteUserDrawer'
 import {
   Alert,
@@ -15,22 +17,11 @@ import { useAuthStore } from '../../stores/authStore'
 import type { InviteCreateResult, InviteRecord } from '../../types'
 
 function SearchIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Zm0-2a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11Zm7.03.47 3.25 3.25-1.41 1.41-3.25-3.25 1.41-1.41Z"
-        fill="currentColor"
-      />
-    </svg>
-  )
+  return <FiSearch size={16} aria-hidden />
 }
 
 function PlusIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5Z" fill="currentColor" />
-    </svg>
-  )
+  return <FiPlus size={14} aria-hidden />
 }
 
 function roleTone(role: string): BadgeTone {
@@ -55,7 +46,9 @@ export function AdminUsersPage() {
 
   const [query, setQuery] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [editingMember, setEditingMember] = useState<AdminMember | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
   const [revokingInviteId, setRevokingInviteId] = useState<number | null>(null)
   const [revokingUserId, setRevokingUserId] = useState<number | null>(null)
 
@@ -92,13 +85,15 @@ export function AdminUsersPage() {
     return users.filter((user) => {
       const name = user.full_name?.toLowerCase() || ''
       const email = user.email.toLowerCase()
-      return name.includes(q) || email.includes(q)
+      const jobRole = user.job_role?.toLowerCase() || ''
+      return name.includes(q) || email.includes(q) || jobRole.includes(q)
     })
   }, [users, query])
 
   async function handleInvite(payload: {
     email: string
     full_name?: string
+    job_role?: string
     send_password: boolean
   }) {
     if (!token) return
@@ -137,6 +132,26 @@ export function AdminUsersPage() {
       setError(err instanceof Error ? err.message : 'Failed to revoke invite')
     } finally {
       setRevokingInviteId(null)
+    }
+  }
+
+  async function handleEditMember(payload: {
+    full_name?: string | null
+    job_role?: string | null
+  }) {
+    if (!token || !editingMember) return
+    setSubmitting(true)
+    setEditError(null)
+    setSuccess(null)
+    try {
+      await adminApi.updateUser(token, editingMember.id, payload)
+      setSuccess(`Updated ${payload.full_name || editingMember.email}.`)
+      setEditingMember(null)
+      await load()
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : 'Failed to update member')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -183,8 +198,20 @@ export function AdminUsersPage() {
         cell: (user) => user.email,
       },
       {
+        id: 'job_role',
+        header: 'Job role',
+        sortable: true,
+        sortValue: (user) => user.job_role || '',
+        cell: (user) =>
+          user.job_role ? (
+            <span className="text-sm text-ink">{user.job_role}</span>
+          ) : (
+            <span className="text-sm text-muted">—</span>
+          ),
+      },
+      {
         id: 'role',
-        header: 'Role',
+        header: 'Access',
         sortable: true,
         sortValue: (user) => user.role,
         cell: (user) => (
@@ -202,20 +229,30 @@ export function AdminUsersPage() {
         cell: (user) => {
           const canRevoke =
             user.role !== 'tenant_owner' && user.id !== currentUser?.id
-          if (!canRevoke) {
-            return <span className="text-xs text-muted">—</span>
-          }
           return (
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-1">
               <Button
                 type="button"
                 variant="ghost"
-                className="h-8 rounded-lg px-3 text-xs font-semibold text-danger hover:bg-danger-soft hover:text-danger"
-                disabled={revokingUserId === user.id}
-                onClick={() => void handleRevokeUser(user)}
+                className="h-8 rounded-lg px-3 text-xs font-semibold"
+                onClick={() => {
+                  setEditError(null)
+                  setEditingMember(user)
+                }}
               >
-                {revokingUserId === user.id ? 'Revoking…' : 'Revoke access'}
+                Edit
               </Button>
+              {canRevoke ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-8 rounded-lg px-3 text-xs font-semibold text-danger hover:bg-danger-soft hover:text-danger"
+                  disabled={revokingUserId === user.id}
+                  onClick={() => void handleRevokeUser(user)}
+                >
+                  {revokingUserId === user.id ? 'Revoking…' : 'Revoke'}
+                </Button>
+              ) : null}
             </div>
           )
         },
@@ -284,6 +321,7 @@ export function AdminUsersPage() {
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink">{invite.email}</p>
                     <p className="mt-0.5 text-xs text-muted">
+                      {invite.job_role ? `${invite.job_role} · ` : ''}
                       {invite.send_password ? 'Password emailed' : 'Invite link only'}
                     </p>
                   </div>
@@ -337,6 +375,18 @@ export function AdminUsersPage() {
           setDrawerError(null)
         }}
         onSubmit={handleInvite}
+      />
+
+      <EditMemberDrawer
+        open={Boolean(editingMember)}
+        member={editingMember}
+        submitting={submitting}
+        error={editError}
+        onClose={() => {
+          setEditingMember(null)
+          setEditError(null)
+        }}
+        onSubmit={handleEditMember}
       />
     </div>
   )

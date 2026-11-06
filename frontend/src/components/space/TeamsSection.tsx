@@ -22,12 +22,12 @@ export function TeamsSection({ teams, onCreate, onAddMembers, onDelete }: TeamsS
         </Button>
       </div>
       {teams.length === 0 ? (
-        <div className="rounded-[24px] border border-dashed border-teal/30 bg-teal-soft/50 px-4 py-14 text-center">
+        <div className="rounded-[36px] border border-dashed border-accent/25 bg-accent-soft/40 px-4 py-14 text-center">
           <p className="font-display text-lg text-ink">No teams yet</p>
           <p className="mt-1 text-sm text-muted">Create a team to organize collaborators.</p>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-4">
+        <div className="grid grid-cols-1 gap-7 sm:grid-cols-2 xl:grid-cols-3">
           {teams.map((team) => (
             <TeamCard
               key={team.id}
