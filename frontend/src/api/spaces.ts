@@ -9,6 +9,9 @@ import type {
   SpacePayload,
   SpaceProject,
   SpaceTeam,
+  TaskAttachment,
+  TaskComment,
+  TaskDetail,
 } from '../types'
 
 export function listSpaces(token: string) {
@@ -210,6 +213,140 @@ export function deleteTask(token: string, spaceId: number, projectId: number, ta
     method: 'DELETE',
     token,
   })
+}
+
+export function getTask(token: string, spaceId: number, projectId: number, taskId: number) {
+  return apiRequest<TaskDetail>(`/spaces/${spaceId}/projects/${projectId}/tasks/${taskId}`, {
+    token,
+  })
+}
+
+export function listTaskComments(
+  token: string,
+  spaceId: number,
+  projectId: number,
+  taskId: number,
+) {
+  return apiRequest<TaskComment[]>(
+    `/spaces/${spaceId}/projects/${projectId}/tasks/${taskId}/comments`,
+    { token },
+  )
+}
+
+export function createTaskComment(
+  token: string,
+  spaceId: number,
+  projectId: number,
+  taskId: number,
+  payload: { body: string; mention_ids?: number[] },
+) {
+  return apiRequest<TaskComment>(
+    `/spaces/${spaceId}/projects/${projectId}/tasks/${taskId}/comments`,
+    {
+      method: 'POST',
+      token,
+      body: payload,
+    },
+  )
+}
+
+export function replyToTaskComment(
+  token: string,
+  spaceId: number,
+  projectId: number,
+  taskId: number,
+  commentId: number,
+  payload: { body: string; mention_ids?: number[] },
+) {
+  return apiRequest<TaskComment>(
+    `/spaces/${spaceId}/projects/${projectId}/tasks/${taskId}/comments/${commentId}/replies`,
+    {
+      method: 'POST',
+      token,
+      body: payload,
+    },
+  )
+}
+
+export function replyToTaskReply(
+  token: string,
+  spaceId: number,
+  projectId: number,
+  taskId: number,
+  replyId: number,
+  payload: { body: string; mention_ids?: number[] },
+) {
+  return apiRequest<TaskComment>(
+    `/spaces/${spaceId}/projects/${projectId}/tasks/${taskId}/replies/${replyId}/replies`,
+    {
+      method: 'POST',
+      token,
+      body: payload,
+    },
+  )
+}
+
+export function deleteTaskComment(
+  token: string,
+  spaceId: number,
+  projectId: number,
+  commentId: number,
+) {
+  return apiRequest<void>(`/spaces/${spaceId}/projects/${projectId}/comments/${commentId}`, {
+    method: 'DELETE',
+    token,
+  })
+}
+
+export function listTaskAttachments(
+  token: string,
+  spaceId: number,
+  projectId: number,
+  taskId: number,
+) {
+  return apiRequest<TaskAttachment[]>(
+    `/spaces/${spaceId}/projects/${projectId}/tasks/${taskId}/attachments`,
+    { token },
+  )
+}
+
+export function uploadTaskAttachment(
+  token: string,
+  spaceId: number,
+  projectId: number,
+  taskId: number,
+  file: File,
+  onProgress?: (percent: number) => void,
+) {
+  return apiUpload<TaskAttachment>(
+    `/spaces/${spaceId}/projects/${projectId}/tasks/${taskId}/attachments`,
+    file,
+    token,
+    'file',
+    onProgress,
+  )
+}
+
+export function deleteTaskAttachment(
+  token: string,
+  spaceId: number,
+  projectId: number,
+  attachmentId: number,
+) {
+  return apiRequest<void>(`/spaces/${spaceId}/projects/${projectId}/attachments/${attachmentId}`, {
+    method: 'DELETE',
+    token,
+  })
+}
+
+export function taskAttachmentDownloadUrl(
+  spaceId: number,
+  projectId: number,
+  attachmentId: number,
+) {
+  return apiDownloadUrl(
+    `/spaces/${spaceId}/projects/${projectId}/attachments/${attachmentId}/download`,
+  )
 }
 
 export function listTeams(token: string, spaceId: number) {

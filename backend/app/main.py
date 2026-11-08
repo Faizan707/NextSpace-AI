@@ -17,6 +17,9 @@ from app.models import (  # noqa: F401
     ProjectTask,
     Space,
     SpaceMember,
+    TaskAttachment,
+    TaskComment,
+    TaskCommentMention,
     Team,
     TeamMember,
     User,
@@ -30,6 +33,9 @@ from app.routers import (
     space_projects,
     space_teams,
     spaces,
+    task_activity,
+    task_comments,
+    task_replies,
     work,
 )
 
@@ -158,6 +164,9 @@ app.include_router(companies.router)
 app.include_router(spaces.router)
 app.include_router(space_projects.router)
 app.include_router(project_board.router)
+app.include_router(task_activity.router)
+app.include_router(task_comments.router)
+app.include_router(task_replies.router)
 app.include_router(work.router)
 app.include_router(space_teams.router)
 app.include_router(space_documents.router)

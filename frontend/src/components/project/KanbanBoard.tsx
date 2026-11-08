@@ -37,6 +37,7 @@ interface KanbanBoardProps {
   stages: ProjectStage[]
   onStagesChange: (stages: ProjectStage[]) => void
   onAddTask: (stageId: number) => void
+  onViewTask: (task: ProjectTask) => void
   onEditTask: (task: ProjectTask) => void
   onMoveTask: (taskId: number, stageId: number, position: number) => Promise<void>
   onDeleteTask: (taskId: number) => Promise<void>
@@ -80,6 +81,7 @@ function TaskCard({
   stageName,
   dragging,
   dragHandleProps,
+  onView,
   onEdit,
   onDelete,
 }: {
@@ -87,6 +89,7 @@ function TaskCard({
   stageName: string
   dragging?: boolean
   dragHandleProps?: Record<string, unknown>
+  onView?: () => void
   onEdit?: () => void
   onDelete?: () => void
 }) {
@@ -110,11 +113,11 @@ function TaskCard({
       <div
         role="button"
         tabIndex={0}
-        onClick={onEdit}
+        onClick={onView}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault()
-            onEdit?.()
+            onView?.()
           }
         }}
         className="block w-full px-4 pb-3 pt-3.5 text-left"
@@ -165,7 +168,7 @@ function TaskCard({
       >
         <button
           type="button"
-          onClick={onEdit}
+          onClick={onView}
           className="inline-flex min-w-0 cursor-pointer items-center gap-1.5 text-left text-[0.8rem] font-semibold text-ink"
         >
           <span className="grid size-6 shrink-0 place-items-center rounded-md border border-line text-muted">
@@ -212,11 +215,13 @@ function TaskCard({
 function SortableTask({
   task,
   stageName,
+  onView,
   onEdit,
   onDelete,
 }: {
   task: ProjectTask
   stageName: string
+  onView: () => void
   onEdit: () => void
   onDelete: () => void
 }) {
@@ -239,6 +244,7 @@ function SortableTask({
         task={task}
         stageName={stageName}
         dragging={isDragging}
+        onView={onView}
         onEdit={onEdit}
         onDelete={onDelete}
         dragHandleProps={{ ...attributes, ...listeners }}
@@ -250,6 +256,7 @@ function SortableTask({
 function StageColumn({
   stage,
   onAddTask,
+  onViewTask,
   onEditTask,
   onDeleteTask,
   onRenameStage,
@@ -257,6 +264,7 @@ function StageColumn({
 }: {
   stage: ProjectStage
   onAddTask: (stageId: number) => void
+  onViewTask: (task: ProjectTask) => void
   onEditTask: (task: ProjectTask) => void
   onDeleteTask: (taskId: number) => Promise<void>
   onRenameStage: (stageId: number, name: string) => Promise<void>
@@ -371,6 +379,7 @@ function StageColumn({
               key={task.id}
               task={task}
               stageName={stage.name}
+              onView={() => onViewTask(task)}
               onEdit={() => onEditTask(task)}
               onDelete={() => void onDeleteTask(task.id)}
             />
@@ -412,6 +421,7 @@ export function KanbanBoard({
   stages,
   onStagesChange,
   onAddTask,
+  onViewTask,
   onEditTask,
   onMoveTask,
   onDeleteTask,
@@ -553,6 +563,7 @@ export function KanbanBoard({
               key={stage.id}
               stage={stage}
               onAddTask={onAddTask}
+              onViewTask={onViewTask}
               onEditTask={onEditTask}
               onDeleteTask={onDeleteTask}
               onRenameStage={onRenameStage}

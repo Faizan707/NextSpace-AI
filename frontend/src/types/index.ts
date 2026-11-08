@@ -168,6 +168,36 @@ export interface ProjectTask {
   updated_at: string
 }
 
+export interface TaskDetail extends ProjectTask {
+  stage_name: string
+  created_by: SpaceCreator
+}
+
+export interface TaskComment {
+  id: number
+  task_id: number
+  author_id: number
+  author: SpaceCreator
+  parent_id: number | null
+  body: string
+  mention_ids: number[]
+  mentions: SpaceCreator[]
+  replies: TaskComment[]
+  created_at: string
+  updated_at: string
+}
+
+export interface TaskAttachment {
+  id: number
+  task_id: number
+  original_name: string
+  content_type: string | null
+  size_bytes: number
+  uploaded_by_id: number
+  uploaded_by: SpaceCreator
+  created_at: string
+}
+
 export interface ProjectStage {
   id: number
   project_id: number

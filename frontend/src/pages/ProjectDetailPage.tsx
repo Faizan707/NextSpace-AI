@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { KanbanBoard } from '../components/project/KanbanBoard'
 import { TaskDrawer, type TaskFormPayload } from '../components/project/TaskDrawer'
+import { TaskViewDrawer } from '../components/project/TaskViewDrawer'
 import { Alert, Button, ProjectDetailSkeleton } from '../components/ui'
 import {
   setBoardStages,
@@ -50,6 +51,8 @@ export function ProjectDetailPage() {
   const [taskDrawerOpen, setTaskDrawerOpen] = useState(false)
   const [taskStageId, setTaskStageId] = useState<number | null>(null)
   const [editingTask, setEditingTask] = useState<ProjectTask | null>(null)
+  const [viewTaskId, setViewTaskId] = useState<number | null>(null)
+  const [viewDrawerOpen, setViewDrawerOpen] = useState(false)
 
   function openCreateTask(stageId: number) {
     setEditingTask(null)
@@ -57,7 +60,13 @@ export function ProjectDetailPage() {
     setTaskDrawerOpen(true)
   }
 
+  function openViewTask(task: ProjectTask) {
+    setViewTaskId(task.id)
+    setViewDrawerOpen(true)
+  }
+
   function openEditTask(task: ProjectTask) {
+    setViewDrawerOpen(false)
     setEditingTask(task)
     setTaskStageId(task.stage_id)
     setTaskDrawerOpen(true)
@@ -67,6 +76,11 @@ export function ProjectDetailPage() {
     setTaskDrawerOpen(false)
     setEditingTask(null)
     setTaskStageId(null)
+  }
+
+  function closeViewDrawer() {
+    setViewDrawerOpen(false)
+    setViewTaskId(null)
   }
 
   function handleStagesChange(next: ProjectStage[]) {
@@ -220,6 +234,7 @@ export function ProjectDetailPage() {
           stages={stages}
           onStagesChange={handleStagesChange}
           onAddTask={openCreateTask}
+          onViewTask={openViewTask}
           onEditTask={openEditTask}
           onMoveTask={handleMoveTask}
           onDeleteTask={handleDeleteTask}
@@ -228,6 +243,20 @@ export function ProjectDetailPage() {
           onAddStage={handleAddStage}
         />
       </section>
+
+      <TaskViewDrawer
+        open={viewDrawerOpen}
+        spaceId={spaceId}
+        projectId={projectId}
+        taskId={viewTaskId}
+        members={people}
+        onClose={closeViewDrawer}
+        onEdit={() => {
+          const task =
+            stages.flatMap((stage) => stage.tasks).find((item) => item.id === viewTaskId) ?? null
+          if (task) openEditTask(task)
+        }}
+      />
 
       <TaskDrawer
         open={taskDrawerOpen}

@@ -134,7 +134,11 @@ def get_stage_in_project(db: Session, project_id: int, stage_id: int) -> Project
 def get_task_in_project(db: Session, project_id: int, task_id: int) -> ProjectTask | None:
     return db.scalar(
         select(ProjectTask)
-        .options(selectinload(ProjectTask.assignee))
+        .options(
+            selectinload(ProjectTask.assignee),
+            selectinload(ProjectTask.created_by),
+            selectinload(ProjectTask.stage),
+        )
         .where(ProjectTask.id == task_id, ProjectTask.project_id == project_id)
     )
 

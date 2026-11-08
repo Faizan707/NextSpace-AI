@@ -29,6 +29,17 @@ export {
   setBoardStages,
 } from './useProjectBoard'
 export {
+  useTaskDetailQuery,
+  useTaskCommentsQuery,
+  useTaskAttachmentsQuery,
+  useCreateTaskCommentMutation,
+  useReplyToCommentMutation,
+  useReplyToReplyMutation,
+  useDeleteTaskCommentMutation,
+  useUploadTaskAttachmentMutation,
+  useDeleteTaskAttachmentMutation,
+} from './useTaskActivity'
+export {
   useCreateProjectMutation,
   useUpdateProjectMutation,
   useDeleteProjectMutation,

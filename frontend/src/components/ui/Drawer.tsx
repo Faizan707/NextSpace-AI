@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Button } from './Button'
+import { cn } from '../../lib/cn'
 
 interface DrawerProps {
   open: boolean
@@ -11,6 +12,8 @@ interface DrawerProps {
   onClose: () => void
   children: ReactNode
   footer?: ReactNode
+  size?: 'md' | 'lg'
+  headerExtra?: ReactNode
 }
 
 export function Drawer({
@@ -21,6 +24,8 @@ export function Drawer({
   onClose,
   children,
   footer,
+  size = 'md',
+  headerExtra,
 }: DrawerProps) {
   useEffect(() => {
     if (!open) return
@@ -52,7 +57,10 @@ export function Drawer({
             role="dialog"
             aria-modal="true"
             aria-label={title}
-            className="relative z-10 flex h-full w-full max-w-md flex-col border-l border-line bg-surface shadow-[-20px_0_50px_rgba(15,23,42,0.12)]"
+            className={cn(
+              'relative z-10 flex h-full w-full flex-col border-l border-line bg-surface shadow-[-20px_0_50px_rgba(15,23,42,0.12)]',
+              size === 'lg' ? 'max-w-xl' : 'max-w-md',
+            )}
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
@@ -67,6 +75,7 @@ export function Drawer({
                 ) : null}
                 <h2 className="mt-1 font-display text-xl font-bold text-ink">{title}</h2>
                 {description ? <p className="mt-1 text-sm text-muted">{description}</p> : null}
+                {headerExtra}
               </div>
               <Button
                 type="button"
@@ -82,7 +91,7 @@ export function Drawer({
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-5">{children}</div>
 
             {footer ? (
-              <div className="border-t border-line px-6 py-5">{footer}</div>
+              <div className="border-t border-line px-6 py-4">{footer}</div>
             ) : null}
           </motion.aside>
         </div>

@@ -15,6 +15,12 @@ export const queryKeys = {
       ['spaces', spaceId, 'projects', projectId] as const,
     board: (spaceId: number, projectId: number) =>
       ['spaces', spaceId, 'projects', projectId, 'board'] as const,
+    task: (spaceId: number, projectId: number, taskId: number) =>
+      ['spaces', spaceId, 'projects', projectId, 'tasks', taskId] as const,
+    taskComments: (spaceId: number, projectId: number, taskId: number) =>
+      ['spaces', spaceId, 'projects', projectId, 'tasks', taskId, 'comments'] as const,
+    taskAttachments: (spaceId: number, projectId: number, taskId: number) =>
+      ['spaces', spaceId, 'projects', projectId, 'tasks', taskId, 'attachments'] as const,
   },
   work: {
     projects: ['work', 'projects'] as const,
