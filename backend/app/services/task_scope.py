@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.project import Project, ProjectTask
 from app.models.user import User, UserRole
 from app.routers.space_projects import _get_project_in_space
-from app.services.space_access import get_accessible_space
+from app.services.space_access import get_accessible_space, require_project_access
 
 
 def task_detail_query():
@@ -25,8 +25,9 @@ def require_task(
     task_id: int,
     current_user: User,
 ) -> tuple[Project, ProjectTask]:
-    get_accessible_space(db, space_id, current_user)
+    space = get_accessible_space(db, space_id, current_user)
     project = _get_project_in_space(db, space_id, project_id)
+    require_project_access(current_user, space, project)
     task = db.scalar(
         task_detail_query().where(ProjectTask.id == task_id, ProjectTask.project_id == project_id)
     )

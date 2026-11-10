@@ -35,6 +35,7 @@ import { cn } from '../../lib/cn'
 
 interface KanbanBoardProps {
   stages: ProjectStage[]
+  canEdit?: boolean
   onStagesChange: (stages: ProjectStage[]) => void
   onAddTask: (stageId: number) => void
   onViewTask: (task: ProjectTask) => void
@@ -215,12 +216,14 @@ function TaskCard({
 function SortableTask({
   task,
   stageName,
+  canEdit,
   onView,
   onEdit,
   onDelete,
 }: {
   task: ProjectTask
   stageName: string
+  canEdit: boolean
   onView: () => void
   onEdit: () => void
   onDelete: () => void
@@ -228,6 +231,7 @@ function SortableTask({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `task-${task.id}`,
     data: { type: 'task', task, stageName },
+    disabled: !canEdit,
   })
 
   return (
@@ -245,9 +249,9 @@ function SortableTask({
         stageName={stageName}
         dragging={isDragging}
         onView={onView}
-        onEdit={onEdit}
-        onDelete={onDelete}
-        dragHandleProps={{ ...attributes, ...listeners }}
+        onEdit={canEdit ? onEdit : undefined}
+        onDelete={canEdit ? onDelete : undefined}
+        dragHandleProps={canEdit ? { ...attributes, ...listeners } : undefined}
       />
     </div>
   )
@@ -255,6 +259,7 @@ function SortableTask({
 
 function StageColumn({
   stage,
+  canEdit,
   onAddTask,
   onViewTask,
   onEditTask,
@@ -263,6 +268,7 @@ function StageColumn({
   onDeleteStage,
 }: {
   stage: ProjectStage
+  canEdit: boolean
   onAddTask: (stageId: number) => void
   onViewTask: (task: ProjectTask) => void
   onEditTask: (task: ProjectTask) => void
@@ -273,6 +279,7 @@ function StageColumn({
   const { setNodeRef, isOver } = useDroppable({
     id: `stage-${stage.id}`,
     data: { type: 'stage', stage },
+    disabled: !canEdit,
   })
   const [renaming, setRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(stage.name)
@@ -335,41 +342,43 @@ function StageColumn({
             </div>
           )}
         </div>
-        <ContextMenu
-          align="end"
-          trigger={({ open, props }) => (
-            <button
-              {...props}
-              aria-label={`Stage actions for ${stage.name}`}
-              className={cn(
-                'grid size-8 shrink-0 cursor-pointer place-items-center rounded-full text-muted transition hover:bg-surface hover:text-ink',
-                open && 'bg-surface text-ink',
-              )}
-            >
-              <MoreIcon />
-            </button>
-          )}
-          items={[
-            {
-              id: 'rename',
-              label: 'Rename',
-              onSelect: () => {
-                setRenameValue(stage.name)
-                setRenaming(true)
+        {canEdit ? (
+          <ContextMenu
+            align="end"
+            trigger={({ open, props }) => (
+              <button
+                {...props}
+                aria-label={`Stage actions for ${stage.name}`}
+                className={cn(
+                  'grid size-8 shrink-0 cursor-pointer place-items-center rounded-full text-muted transition hover:bg-surface hover:text-ink',
+                  open && 'bg-surface text-ink',
+                )}
+              >
+                <MoreIcon />
+              </button>
+            )}
+            items={[
+              {
+                id: 'rename',
+                label: 'Rename',
+                onSelect: () => {
+                  setRenameValue(stage.name)
+                  setRenaming(true)
+                },
               },
-            },
-            ...(!stage.is_default
-              ? [
-                  {
-                    id: 'delete',
-                    label: 'Delete stage',
-                    danger: true as const,
-                    onSelect: () => void onDeleteStage(stage.id),
-                  },
-                ]
-              : []),
-          ]}
-        />
+              ...(!stage.is_default
+                ? [
+                    {
+                      id: 'delete',
+                      label: 'Delete stage',
+                      danger: true as const,
+                      onSelect: () => void onDeleteStage(stage.id),
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        ) : null}
       </div>
 
       <div ref={setNodeRef} className="flex min-h-[120px] flex-1 flex-col gap-3 p-3.5">
@@ -379,6 +388,7 @@ function StageColumn({
               key={task.id}
               task={task}
               stageName={stage.name}
+              canEdit={canEdit}
               onView={() => onViewTask(task)}
               onEdit={() => onEditTask(task)}
               onDelete={() => void onDeleteTask(task.id)}
@@ -386,14 +396,16 @@ function StageColumn({
           ))}
         </SortableContext>
 
-        <button
-          type="button"
-          onClick={() => onAddTask(stage.id)}
-          className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-2xl border border-dashed border-line px-3 py-2.5 text-sm font-semibold text-muted transition hover:border-teal hover:bg-surface hover:text-teal"
-        >
-          <FiPlus size={14} aria-hidden />
-          Add task
-        </button>
+        {canEdit ? (
+          <button
+            type="button"
+            onClick={() => onAddTask(stage.id)}
+            className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-2xl border border-dashed border-line px-3 py-2.5 text-sm font-semibold text-muted transition hover:border-teal hover:bg-surface hover:text-teal"
+          >
+            <FiPlus size={14} aria-hidden />
+            Add task
+          </button>
+        ) : null}
       </div>
     </div>
   )
@@ -419,6 +431,7 @@ function parseStageId(id: string | number) {
 
 export function KanbanBoard({
   stages,
+  canEdit = true,
   onStagesChange,
   onAddTask,
   onViewTask,
@@ -465,6 +478,7 @@ export function KanbanBoard({
   }
 
   function handleDragStart(event: DragStartEvent) {
+    if (!canEdit) return
     const taskId = parseTaskId(event.active.id)
     if (taskId == null) return
     const stage = findStageByTaskId(stages, taskId)
@@ -473,6 +487,7 @@ export function KanbanBoard({
   }
 
   function handleDragOver(event: DragOverEvent) {
+    if (!canEdit) return
     const { active, over } = event
     if (!over) return
     const activeTaskId = parseTaskId(active.id)
@@ -499,6 +514,7 @@ export function KanbanBoard({
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     setActiveTask(null)
+    if (!canEdit) return
     const activeTaskId = parseTaskId(active.id)
     if (activeTaskId == null || !over) return
 
@@ -562,6 +578,7 @@ export function KanbanBoard({
             <StageColumn
               key={stage.id}
               stage={stage}
+              canEdit={canEdit}
               onAddTask={onAddTask}
               onViewTask={onViewTask}
               onEditTask={onEditTask}
@@ -571,61 +588,63 @@ export function KanbanBoard({
             />
           ))}
 
-          <div className="w-[260px] shrink-0">
-            {addingStage ? (
-              <div className="rounded-[22px] border border-dashed border-line bg-surface p-3">
-                <input
-                  id="new-stage-name"
-                  value={stageName}
-                  onChange={(event) => setStageName(event.target.value)}
-                  placeholder="Stage name"
-                  autoFocus
-                  className={cn(controlClass, '!py-2 text-sm')}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      void submitStage()
-                    }
-                    if (event.key === 'Escape') {
-                      setAddingStage(false)
-                      setStageName('')
-                    }
-                  }}
-                />
-                <div className="mt-2 flex gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="flex-1"
-                    disabled={stageBusy || !stageName.trim()}
-                    onClick={() => void submitStage()}
-                  >
-                    Add stage
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => {
-                      setAddingStage(false)
-                      setStageName('')
+          {canEdit ? (
+            <div className="w-[260px] shrink-0">
+              {addingStage ? (
+                <div className="rounded-[22px] border border-dashed border-line bg-surface p-3">
+                  <input
+                    id="new-stage-name"
+                    value={stageName}
+                    onChange={(event) => setStageName(event.target.value)}
+                    placeholder="Stage name"
+                    autoFocus
+                    className={cn(controlClass, '!py-2 text-sm')}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        void submitStage()
+                      }
+                      if (event.key === 'Escape') {
+                        setAddingStage(false)
+                        setStageName('')
+                      }
                     }}
-                  >
-                    Cancel
-                  </Button>
+                  />
+                  <div className="mt-2 flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="flex-1"
+                      disabled={stageBusy || !stageName.trim()}
+                      onClick={() => void submitStage()}
+                    >
+                      Add stage
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        setAddingStage(false)
+                        setStageName('')
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setAddingStage(true)}
-                className="inline-flex h-[56px] w-full cursor-pointer items-center justify-center gap-1.5 rounded-[22px] border border-dashed border-line bg-bg-elevated/40 text-sm font-semibold text-muted transition hover:border-accent hover:text-accent"
-              >
-                <FiPlus size={14} aria-hidden />
-                Add stage
-              </button>
-            )}
-          </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAddingStage(true)}
+                  className="inline-flex h-[56px] w-full cursor-pointer items-center justify-center gap-1.5 rounded-[22px] border border-dashed border-line bg-bg-elevated/40 text-sm font-semibold text-muted transition hover:border-accent hover:text-accent"
+                >
+                  <FiPlus size={14} aria-hidden />
+                  Add stage
+                </button>
+              )}
+            </div>
+          ) : null}
         </div>
 
         <DragOverlay>

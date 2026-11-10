@@ -77,14 +77,42 @@ export function useAddProjectMembersMutation(spaceId: number) {
   const token = useAuthToken()
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ projectId, userIds }: { projectId: number; userIds: number[] }) =>
-      spacesApi.addProjectMembers(requireToken(token), spaceId, projectId, userIds),
+    mutationFn: ({
+      projectId,
+      userIds = [],
+      teamIds = [],
+    }: {
+      projectId: number
+      userIds?: number[]
+      teamIds?: number[]
+    }) => spacesApi.addProjectMembers(requireToken(token), spaceId, projectId, { userIds, teamIds }),
     onSuccess: (project) => {
       queryClient.setQueryData<SpaceProject[]>(queryKeys.spaces.projects(spaceId), (prev) =>
         prev?.map((item) => (item.id === project.id ? project : item)),
       )
       void queryClient.invalidateQueries({
         queryKey: queryKeys.project.detail(spaceId, project.id),
+      })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.work.projects })
+    },
+  })
+}
+
+export function useRemoveProjectMemberMutation(spaceId: number) {
+  const token = useAuthToken()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ projectId, userId }: { projectId: number; userId: number }) =>
+      spacesApi.removeProjectMember(requireToken(token), spaceId, projectId, userId),
+    onSuccess: (project) => {
+      queryClient.setQueryData<SpaceProject[]>(queryKeys.spaces.projects(spaceId), (prev) =>
+        prev?.map((item) => (item.id === project.id ? project : item)),
+      )
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.project.detail(spaceId, project.id),
+      })
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.project.board(spaceId, project.id),
       })
       void queryClient.invalidateQueries({ queryKey: queryKeys.work.projects })
     },
@@ -165,6 +193,38 @@ export function useUploadDocumentMutation(spaceId: number) {
   })
 }
 
+export function useAddDocumentMembersMutation(spaceId: number) {
+  const token = useAuthToken()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ documentId, userIds }: { documentId: number; userIds: number[] }) =>
+      spacesApi.addDocumentMembers(requireToken(token), spaceId, documentId, userIds),
+    onSuccess: (doc) => {
+      queryClient.setQueryData<SpaceDocument[]>(queryKeys.spaces.documents(spaceId), (prev) =>
+        prev?.map((item) => (item.id === doc.id ? doc : item)),
+      )
+      void queryClient.invalidateQueries({ queryKey: queryKeys.spaces.detail(spaceId) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.spaces.all })
+    },
+  })
+}
+
+export function useRemoveDocumentMemberMutation(spaceId: number) {
+  const token = useAuthToken()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ documentId, userId }: { documentId: number; userId: number }) =>
+      spacesApi.removeDocumentMember(requireToken(token), spaceId, documentId, userId),
+    onSuccess: (doc) => {
+      queryClient.setQueryData<SpaceDocument[]>(queryKeys.spaces.documents(spaceId), (prev) =>
+        prev?.map((item) => (item.id === doc.id ? doc : item)),
+      )
+      void queryClient.invalidateQueries({ queryKey: queryKeys.spaces.detail(spaceId) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.spaces.all })
+    },
+  })
+}
+
 export function useDeleteDocumentMutation(spaceId: number) {
   const token = useAuthToken()
   const queryClient = useQueryClient()
@@ -177,6 +237,20 @@ export function useDeleteDocumentMutation(spaceId: number) {
       )
       void queryClient.invalidateQueries({ queryKey: queryKeys.spaces.detail(spaceId) })
       void queryClient.invalidateQueries({ queryKey: queryKeys.spaces.all })
+    },
+  })
+}
+
+export function useRunDocumentComplianceMutation(spaceId: number) {
+  const token = useAuthToken()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (documentId: number) =>
+      spacesApi.runDocumentComplianceCheck(requireToken(token), spaceId, documentId),
+    onSuccess: (doc) => {
+      queryClient.setQueryData<SpaceDocument[]>(queryKeys.spaces.documents(spaceId), (prev) =>
+        prev?.map((item) => (item.id === doc.id ? doc : item)),
+      )
     },
   })
 }

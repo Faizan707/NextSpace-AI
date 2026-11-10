@@ -9,7 +9,12 @@ from app.models.team import Team, TeamMember
 from app.models.user import User
 from app.schemas.space import SpaceCreatorRead, SpaceMembersAdd
 from app.schemas.team import TeamCreate, TeamRead, TeamUpdate
-from app.services.space_access import get_accessible_space
+from app.services.space_access import (
+    can_access_team,
+    can_manage_space,
+    get_accessible_space,
+    require_team_access,
+)
 
 router = APIRouter(prefix="/spaces", tags=["space-teams"])
 
@@ -51,13 +56,14 @@ def list_teams(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[TeamRead]:
-    get_accessible_space(db, space_id, current_user)
+    space = get_accessible_space(db, space_id, current_user)
     teams = list(
         db.scalars(
             _team_query().where(Team.space_id == space_id).order_by(Team.created_at.desc())
         ).all()
     )
-    return [_to_read(team) for team in teams]
+    visible = [team for team in teams if can_access_team(current_user, space, team)]
+    return [_to_read(team) for team in visible]
 
 
 @router.post("/{space_id}/teams", response_model=TeamRead, status_code=status.HTTP_201_CREATED)
@@ -107,8 +113,12 @@ def update_team(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> TeamRead:
-    get_accessible_space(db, space_id, current_user)
+    space = get_accessible_space(db, space_id, current_user)
     team = _get_team_in_space(db, space_id, team_id)
+    require_team_access(current_user, space, team)
+
+    if not (can_manage_space(current_user, space) or team.created_by_id == current_user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed to update this team")
 
     for field, value in payload.model_dump(exclude_unset=True).items():
         if field == "name" and isinstance(value, str):
@@ -130,6 +140,11 @@ def add_team_members(
 ) -> TeamRead:
     space = get_accessible_space(db, space_id, current_user)
     team = _get_team_in_space(db, space_id, team_id)
+    require_team_access(current_user, space, team)
+
+    if not (can_manage_space(current_user, space) or team.created_by_id == current_user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed to manage members")
+
     space_member_ids = {membership.user_id for membership in space.memberships}
     existing = {membership.user_id for membership in team.memberships}
 
@@ -158,7 +173,11 @@ def delete_team(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> None:
-    get_accessible_space(db, space_id, current_user)
+    space = get_accessible_space(db, space_id, current_user)
     team = _get_team_in_space(db, space_id, team_id)
+
+    if not (can_manage_space(current_user, space) or team.created_by_id == current_user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed to delete this team")
+
     db.delete(team)
     db.commit()

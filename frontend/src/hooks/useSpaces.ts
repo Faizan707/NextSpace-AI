@@ -114,6 +114,9 @@ export function useRemoveSpaceMemberMutation() {
     onSuccess: (space) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.spaces.all })
       void queryClient.invalidateQueries({ queryKey: queryKeys.spaces.detail(space.id) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.spaces.projects(space.id) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.spaces.teams(space.id) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.work.projects })
     },
   })
 }

@@ -4,6 +4,7 @@ import { ProjectCard } from './ProjectCard'
 
 interface ProjectsSectionProps {
   projects: SpaceProject[]
+  canManageProject?: (project: SpaceProject) => boolean
   onCreate: () => void
   onOpen: (project: SpaceProject) => void
   onEdit: (project: SpaceProject) => void
@@ -13,6 +14,7 @@ interface ProjectsSectionProps {
 
 export function ProjectsSection({
   projects,
+  canManageProject,
   onCreate,
   onOpen,
   onEdit,
@@ -41,6 +43,7 @@ export function ProjectsSection({
             <ProjectCard
               key={project.id}
               project={project}
+              canManage={canManageProject?.(project) ?? false}
               onOpen={onOpen}
               onEdit={onEdit}
               onAddMembers={onAddMembers}

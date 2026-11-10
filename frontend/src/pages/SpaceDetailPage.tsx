@@ -1,15 +1,22 @@
 import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { FiPlus } from 'react-icons/fi'
+import { useNavigate, useParams } from 'react-router-dom'
 import * as spacesApi from '../api/spaces'
+import { AddSpaceMembersDrawer } from '../components/AddSpaceMembersDrawer'
 import { Avatar } from '../components/Avatar'
 import { SpaceMembersDrawer } from '../components/SpaceMembersDrawer'
+import {
+  AddProjectMembersPicker,
+  countProjectAddSelection,
+} from '../components/space/AddProjectMembersPicker'
 import { DocumentPreviewModal } from '../components/space/DocumentPreviewModal'
 import { DocumentsSection } from '../components/space/DocumentsSection'
 import { ProjectsSection } from '../components/space/ProjectsSection'
 import { TeamsSection } from '../components/space/TeamsSection'
 import {
   Alert,
+  Breadcrumbs,
   Button,
   DeadlinePicker,
   Drawer,
@@ -19,13 +26,17 @@ import {
   Textarea,
 } from '../components/ui'
 import {
+  useAddDocumentMembersMutation,
   useAddProjectMembersMutation,
+  useAddSpaceMembersMutation,
   useAddTeamMembersMutation,
   useCreateProjectMutation,
   useCreateTeamMutation,
   useDeleteDocumentMutation,
   useDeleteProjectMutation,
   useDeleteTeamMutation,
+  useRemoveSpaceMemberMutation,
+  useRunDocumentComplianceMutation,
   useSpaceDocumentsQuery,
   useSpaceProjectsQuery,
   useSpaceQuery,
@@ -80,11 +91,15 @@ export function SpaceDetailPage() {
   const updateProject = useUpdateProjectMutation(spaceId)
   const deleteProject = useDeleteProjectMutation(spaceId)
   const addProjectMembers = useAddProjectMembersMutation(spaceId)
+  const addSpaceMembers = useAddSpaceMembersMutation()
+  const removeSpaceMember = useRemoveSpaceMemberMutation()
   const createTeam = useCreateTeamMutation(spaceId)
   const deleteTeam = useDeleteTeamMutation(spaceId)
   const addTeamMembers = useAddTeamMembersMutation(spaceId)
   const uploadDocument = useUploadDocumentMutation(spaceId)
+  const addDocumentMembers = useAddDocumentMembersMutation(spaceId)
   const deleteDocument = useDeleteDocumentMutation(spaceId)
+  const runDocumentCompliance = useRunDocumentComplianceMutation(spaceId)
 
   const space = spaceQuery.data ?? null
   const projects = projectsQuery.data ?? []
@@ -108,6 +123,7 @@ export function SpaceDetailPage() {
   const [docOpen, setDocOpen] = useState(false)
   const [membersProject, setMembersProject] = useState<SpaceProject | null>(null)
   const [membersTeam, setMembersTeam] = useState<SpaceTeam | null>(null)
+  const [membersDocument, setMembersDocument] = useState<SpaceDocument | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
 
   const [projectName, setProjectName] = useState('')
@@ -118,22 +134,29 @@ export function SpaceDetailPage() {
   const [teamDescription, setTeamDescription] = useState('')
   const [selectedMembers, setSelectedMembers] = useState<Set<number>>(new Set())
   const [projectAddSelected, setProjectAddSelected] = useState<Set<number>>(new Set())
+  const [projectAddTeamsSelected, setProjectAddTeamsSelected] = useState<Set<number>>(new Set())
   const [teamAddSelected, setTeamAddSelected] = useState<Set<number>>(new Set())
+  const [documentAddSelected, setDocumentAddSelected] = useState<Set<number>>(new Set())
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [previewDocument, setPreviewDocument] = useState<SpaceDocument | null>(null)
   const [membersOpen, setMembersOpen] = useState(false)
   const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null)
+  const [addSpaceMembersOpen, setAddSpaceMembersOpen] = useState(false)
+  const [removingMemberId, setRemovingMemberId] = useState<number | null>(null)
 
   const submitting =
     createProject.isPending ||
     updateProject.isPending ||
     deleteProject.isPending ||
     addProjectMembers.isPending ||
+    addSpaceMembers.isPending ||
+    removeSpaceMember.isPending ||
     createTeam.isPending ||
     deleteTeam.isPending ||
     addTeamMembers.isPending ||
     uploadDocument.isPending ||
+    addDocumentMembers.isPending ||
     deleteDocument.isPending
 
   const selectableMembers = useMemo(
@@ -141,21 +164,43 @@ export function SpaceDetailPage() {
     [space, currentUser?.id],
   )
 
-  const projectAddCandidates = useMemo(() => {
-    if (!membersProject || !space) return []
-    const existing = new Set(
+  const projectExistingMemberIds = useMemo(() => {
+    if (!membersProject) return new Set<number>()
+    return new Set(
       (membersProject.members?.length ? membersProject.members : [membersProject.created_by]).map(
         (member) => member.id,
       ),
     )
-    return space.members.filter((member) => !existing.has(member.id))
-  }, [membersProject, space])
+  }, [membersProject])
+
+  const projectAddSelectionCount = useMemo(
+    () =>
+      countProjectAddSelection(
+        projectAddSelected,
+        projectAddTeamsSelected,
+        teams,
+        projectExistingMemberIds,
+      ),
+    [projectAddSelected, projectAddTeamsSelected, teams, projectExistingMemberIds],
+  )
 
   const teamAddCandidates = useMemo(() => {
     if (!membersTeam || !space) return []
     const existing = new Set(membersTeam.members.map((member) => member.id))
     return space.members.filter((member) => !existing.has(member.id))
   }, [membersTeam, space])
+
+  const documentAddCandidates = useMemo(() => {
+    if (!membersDocument || !space) return []
+    const existing = new Set(
+      (
+        membersDocument.members?.length
+          ? membersDocument.members
+          : [membersDocument.uploaded_by]
+      ).map((member) => member.id),
+    )
+    return space.members.filter((member) => !existing.has(member.id))
+  }, [membersDocument, space])
 
   function resetProjectForm() {
     setProjectName('')
@@ -214,16 +259,50 @@ export function SpaceDetailPage() {
     }
   }
 
+  function resetProjectAddSelection() {
+    setProjectAddSelected(new Set())
+    setProjectAddTeamsSelected(new Set())
+  }
+
+  function toggleProjectAddMember(userId: number) {
+    setProjectAddSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(userId)) next.delete(userId)
+      else next.add(userId)
+      return next
+    })
+  }
+
+  function toggleProjectAddTeam(teamId: number) {
+    setProjectAddTeamsSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(teamId)) next.delete(teamId)
+      else next.add(teamId)
+      return next
+    })
+  }
+
   async function handleAddProjectMembers() {
-    if (!membersProject || projectAddSelected.size === 0) return
+    if (
+      !membersProject ||
+      (projectAddSelected.size === 0 && projectAddTeamsSelected.size === 0)
+    ) {
+      return
+    }
     setFormError(null)
     try {
       await addProjectMembers.mutateAsync({
         projectId: membersProject.id,
         userIds: [...projectAddSelected],
+        teamIds: [...projectAddTeamsSelected],
       })
+      toast.success(
+        projectAddSelectionCount === 1
+          ? '1 member added'
+          : `${projectAddSelectionCount} members added`,
+      )
       setMembersProject(null)
-      setProjectAddSelected(new Set())
+      resetProjectAddSelection()
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to add members')
     }
@@ -262,6 +341,12 @@ export function SpaceDetailPage() {
       setUploadFile(null)
       setUploadProgress(0)
       toast.success('Document uploaded', created.original_name)
+      const runCheck = window.confirm(
+        `Do you want to check compliance for “${created.original_name}”?`,
+      )
+      if (runCheck) {
+        await handleDocumentComplianceCheck(created)
+      }
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to upload document')
       toast.error('Upload failed', err instanceof Error ? err.message : undefined)
@@ -283,6 +368,22 @@ export function SpaceDetailPage() {
     }
   }
 
+  async function handleAddDocumentMembers() {
+    if (!membersDocument || documentAddSelected.size === 0) return
+    setFormError(null)
+    try {
+      await addDocumentMembers.mutateAsync({
+        documentId: membersDocument.id,
+        userIds: [...documentAddSelected],
+      })
+      setMembersDocument(null)
+      setDocumentAddSelected(new Set())
+      toast.success('Document shared')
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Failed to add members')
+    }
+  }
+
   async function handleDeleteProject(project: SpaceProject) {
     if (!window.confirm('Delete this project?')) return
     await deleteProject.mutateAsync(project.id)
@@ -296,6 +397,27 @@ export function SpaceDetailPage() {
   async function handleDeleteDocument(document: SpaceDocument) {
     if (!window.confirm('Delete this document?')) return
     await deleteDocument.mutateAsync(document.id)
+  }
+
+  async function handleDocumentComplianceCheck(document: SpaceDocument) {
+    try {
+      const updated = await runDocumentCompliance.mutateAsync(document.id)
+      const status = updated.compliance_status || 'pending'
+      if (status === 'passed') {
+        toast.success('Compliance passed', updated.compliance_summary || undefined)
+      } else if (status === 'failed') {
+        toast.error('Compliance failed', updated.compliance_summary || undefined)
+      } else if (status === 'error') {
+        toast.error('Compliance error', updated.compliance_summary || undefined)
+      } else {
+        toast.success('Compliance checked', updated.compliance_summary || undefined)
+      }
+    } catch (err) {
+      toast.error(
+        'Compliance check failed',
+        err instanceof Error ? err.message : undefined,
+      )
+    }
   }
 
   async function handleDownload(document: SpaceDocument) {
@@ -325,8 +447,8 @@ export function SpaceDetailPage() {
     })
   }
 
-  function toggleProjectAddMember(userId: number) {
-    setProjectAddSelected((prev) => {
+  function toggleTeamAddMember(userId: number) {
+    setTeamAddSelected((prev) => {
       const next = new Set(prev)
       if (next.has(userId)) next.delete(userId)
       else next.add(userId)
@@ -334,8 +456,8 @@ export function SpaceDetailPage() {
     })
   }
 
-  function toggleTeamAddMember(userId: number) {
-    setTeamAddSelected((prev) => {
+  function toggleDocumentAddMember(userId: number) {
+    setDocumentAddSelected((prev) => {
       const next = new Set(prev)
       if (next.has(userId)) next.delete(userId)
       else next.add(userId)
@@ -362,8 +484,13 @@ export function SpaceDetailPage() {
     )
   }
 
+  const currentSpace = space
   const spaceMembers =
-    space.members?.length > 0 ? space.members : space.created_by ? [space.created_by] : []
+    currentSpace.members?.length > 0
+      ? currentSpace.members
+      : currentSpace.created_by
+        ? [currentSpace.created_by]
+        : []
   const memberPreview = spaceMembers.slice(0, 4)
   const memberExtra = Math.max(spaceMembers.length - memberPreview.length, 0)
 
@@ -372,56 +499,99 @@ export function SpaceDetailPage() {
     setMembersOpen(true)
   }
 
+  async function handleAddSpaceMembers(userIds: number[]) {
+    await addSpaceMembers.mutateAsync({ spaceId: currentSpace.id, userIds })
+    toast.success('Members added')
+    setAddSpaceMembersOpen(false)
+  }
+
+  const canManageSpace =
+    currentUser?.role === 'tenant_owner' || currentSpace.created_by_id === currentUser?.id
+
+  async function handleRemoveSpaceMember(member: SpaceCreator) {
+    if (
+      !window.confirm(
+        `Remove ${member.full_name || member.email} from this space? They will also lose project and team access here.`,
+      )
+    ) {
+      return
+    }
+    setRemovingMemberId(member.id)
+    try {
+      await removeSpaceMember.mutateAsync({ spaceId, userId: member.id })
+      toast.success('Member removed', member.full_name || member.email)
+      if (selectedMemberId === member.id) {
+        setSelectedMemberId(null)
+      }
+    } catch (err) {
+      toast.error('Failed to remove member', err instanceof Error ? err.message : undefined)
+    } finally {
+      setRemovingMemberId(null)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-7xl space-y-8">
       <section className="fade-up">
-        <Link to="/app/spaces" className="text-sm font-semibold text-accent hover:underline">
-          ← Back to spaces
-        </Link>
+        <Breadcrumbs
+          items={[
+            { label: 'Spaces', to: '/app/spaces' },
+            { label: currentSpace.name },
+          ]}
+        />
         <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="font-display text-3xl font-bold text-ink">{space.name}</h1>
-            <p className="mt-1 text-muted">{space.description || 'No description'}</p>
+            <h1 className="font-display text-3xl font-bold text-ink">{currentSpace.name}</h1>
+            <p className="mt-1 text-muted">{currentSpace.description || 'No description'}</p>
           </div>
           <div className="flex flex-col items-end gap-2.5">
             <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-bold uppercase text-accent">
-              {space.space_type}
+              {currentSpace.space_type}
             </span>
-            {spaceMembers.length > 0 ? (
-              <div className="flex items-center" aria-label="Space members">
-                {memberPreview.map((member, index) => (
-                  <button
-                    key={member.id}
-                    type="button"
-                    title={member.full_name || member.email}
-                    aria-label={`View ${member.full_name || member.email}`}
-                    onClick={() => openMembers(member)}
-                    className={cn(
-                      'cursor-pointer rounded-full transition hover:z-10 hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
-                      index === 0 ? undefined : 'ml-[-8px]',
-                    )}
-                  >
-                    <Avatar
-                      name={member.full_name}
-                      email={member.email}
-                      imageUrl={member.avatar_url}
-                      className="pointer-events-none"
-                    />
-                  </button>
-                ))}
-                {memberExtra > 0 ? (
-                  <button
-                    type="button"
-                    title={`View all ${spaceMembers.length} members`}
-                    aria-label={`View all ${spaceMembers.length} members`}
-                    onClick={() => openMembers()}
-                    className="ml-[-8px] grid size-9 cursor-pointer place-items-center rounded-full bg-bg-elevated text-[0.7rem] font-bold text-muted ring-2 ring-surface transition hover:z-10 hover:scale-110 hover:text-ink"
-                  >
-                    +{memberExtra}
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
+            <div className="flex items-center" aria-label="Space members">
+              {memberPreview.map((member, index) => (
+                <button
+                  key={member.id}
+                  type="button"
+                  title={member.full_name || member.email}
+                  aria-label={`View ${member.full_name || member.email}`}
+                  onClick={() => openMembers(member)}
+                  className={cn(
+                    'cursor-pointer rounded-full transition hover:z-10 hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+                    index === 0 ? undefined : 'ml-[-8px]',
+                  )}
+                >
+                  <Avatar
+                    name={member.full_name}
+                    email={member.email}
+                    imageUrl={member.avatar_url}
+                    className="pointer-events-none"
+                  />
+                </button>
+              ))}
+              {memberExtra > 0 ? (
+                <button
+                  type="button"
+                  title={`View all ${spaceMembers.length} members`}
+                  aria-label={`View all ${spaceMembers.length} members`}
+                  onClick={() => openMembers()}
+                  className="ml-[-8px] grid size-9 cursor-pointer place-items-center rounded-full bg-bg-elevated text-[0.7rem] font-bold text-muted ring-2 ring-surface transition hover:z-10 hover:scale-110 hover:text-ink"
+                >
+                  +{memberExtra}
+                </button>
+              ) : null}
+              {canManageSpace ? (
+                <button
+                  type="button"
+                  title="Add members"
+                  aria-label="Add space members"
+                  onClick={() => setAddSpaceMembersOpen(true)}
+                  className="ml-2 grid size-9 cursor-pointer place-items-center rounded-full border border-dashed border-line text-muted transition hover:border-accent hover:bg-accent-soft hover:text-accent"
+                >
+                  <FiPlus size={16} aria-hidden />
+                </button>
+              ) : null}
+            </div>
           </div>
         </div>
       </section>
@@ -430,24 +600,41 @@ export function SpaceDetailPage() {
 
       <SpaceMembersDrawer
         open={membersOpen}
-        spaceName={space.name}
+        spaceName={currentSpace.name}
         members={spaceMembers}
         selectedId={selectedMemberId}
+        canManage={canManageSpace}
+        creatorId={currentSpace.created_by_id}
+        removingId={removingMemberId}
         onSelect={(member) => setSelectedMemberId(member.id)}
+        onRemove={(member) => void handleRemoveSpaceMember(member)}
         onClose={() => {
           setMembersOpen(false)
           setSelectedMemberId(null)
         }}
       />
 
+      <AddSpaceMembersDrawer
+        open={addSpaceMembersOpen}
+        space={currentSpace}
+        submitting={addSpaceMembers.isPending || removeSpaceMember.isPending}
+        removingId={removingMemberId}
+        onClose={() => setAddSpaceMembersOpen(false)}
+        onSubmit={handleAddSpaceMembers}
+        onRemove={handleRemoveSpaceMember}
+      />
+
       <ProjectsSection
         projects={projects}
+        canManageProject={(project) =>
+          canManageSpace || project.created_by_id === currentUser?.id
+        }
         onCreate={openCreateProject}
         onOpen={(project) => navigate(`/app/spaces/${spaceId}/projects/${project.id}`)}
         onEdit={openEditProject}
         onAddMembers={(project) => {
           setFormError(null)
-          setProjectAddSelected(new Set())
+          resetProjectAddSelection()
           setMembersProject(project)
         }}
         onDelete={(project) => void handleDeleteProject(project)}
@@ -455,6 +642,7 @@ export function SpaceDetailPage() {
 
       <TeamsSection
         teams={teams}
+        canManageTeam={(team) => canManageSpace || team.created_by_id === currentUser?.id}
         onCreate={() => {
           setFormError(null)
           setTeamOpen(true)
@@ -469,13 +657,27 @@ export function SpaceDetailPage() {
 
       <DocumentsSection
         documents={documents}
+        canManageDocument={(document) =>
+          canManageSpace || document.uploaded_by_id === currentUser?.id
+        }
+        complianceDocumentId={
+          runDocumentCompliance.isPending
+            ? (runDocumentCompliance.variables ?? null)
+            : null
+        }
         onUpload={() => {
           setFormError(null)
           setDocOpen(true)
         }}
+        onAddMembers={(document) => {
+          setFormError(null)
+          setDocumentAddSelected(new Set())
+          setMembersDocument(document)
+        }}
         onPreview={setPreviewDocument}
         onDownload={(document) => void handleDownload(document)}
         onDelete={(document) => void handleDeleteDocument(document)}
+        onComplianceCheck={(document) => void handleDocumentComplianceCheck(document)}
       />
 
       <DocumentPreviewModal
@@ -568,44 +770,23 @@ export function SpaceDetailPage() {
         open={Boolean(membersProject)}
         eyebrow="Projects"
         title={membersProject ? `Add members · ${membersProject.name}` : 'Add members'}
-        description="Choose space members who are not already on this project."
+        description="Add people or whole teams. Anyone already on the project is skipped."
         onClose={() => {
           setMembersProject(null)
-          setProjectAddSelected(new Set())
+          resetProjectAddSelection()
         }}
       >
         <div className="flex flex-1 flex-col gap-4">
           {formError ? <Alert>{formError}</Alert> : null}
-          {projectAddCandidates.length === 0 ? (
-            <p className="text-sm text-muted">Everyone in this space is already on the project.</p>
-          ) : (
-            projectAddCandidates.map((member) => {
-              const checked = projectAddSelected.has(member.id)
-              return (
-                <label
-                  key={member.id}
-                  className={cn(
-                    'flex cursor-pointer items-center gap-3 rounded-2xl border border-line bg-surface-2 px-3.5 py-3',
-                    checked && 'border-accent/40 bg-accent-soft',
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleProjectAddMember(member.id)}
-                    className="size-4 accent-[var(--color-accent)]"
-                  />
-                  <Avatar name={member.full_name} email={member.email} imageUrl={member.avatar_url} />
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold text-ink">
-                      {member.full_name || 'Unnamed'}
-                    </span>
-                    <span className="block truncate text-xs text-muted">{member.email}</span>
-                  </span>
-                </label>
-              )
-            })
-          )}
+          <AddProjectMembersPicker
+            people={space?.members ?? []}
+            teams={teams}
+            existingMemberIds={projectExistingMemberIds}
+            selectedPeople={projectAddSelected}
+            selectedTeams={projectAddTeamsSelected}
+            onTogglePerson={toggleProjectAddMember}
+            onToggleTeam={toggleProjectAddTeam}
+          />
           <div className="mt-auto flex gap-3 border-t border-line pt-5">
             <Button
               type="button"
@@ -613,7 +794,7 @@ export function SpaceDetailPage() {
               className="flex-1"
               onClick={() => {
                 setMembersProject(null)
-                setProjectAddSelected(new Set())
+                resetProjectAddSelection()
               }}
             >
               Cancel
@@ -621,10 +802,17 @@ export function SpaceDetailPage() {
             <Button
               type="button"
               className="flex-[1.3]"
-              disabled={submitting || projectAddSelected.size === 0}
+              disabled={
+                submitting ||
+                (projectAddSelected.size === 0 && projectAddTeamsSelected.size === 0)
+              }
               onClick={() => void handleAddProjectMembers()}
             >
-              {submitting ? 'Adding…' : 'Add members'}
+              {submitting
+                ? 'Adding…'
+                : projectAddSelectionCount > 0
+                  ? `Add (${projectAddSelectionCount})`
+                  : 'Add members'}
             </Button>
           </div>
         </div>
@@ -759,6 +947,76 @@ export function SpaceDetailPage() {
               onClick={() => void handleAddTeamMembers()}
             >
               {submitting ? 'Adding…' : 'Add members'}
+            </Button>
+          </div>
+        </div>
+      </Drawer>
+
+      <Drawer
+        open={Boolean(membersDocument)}
+        eyebrow="Documents"
+        title={
+          membersDocument
+            ? `Share · ${membersDocument.original_name}`
+            : 'Share document'
+        }
+        description="Choose space members who can see this document."
+        onClose={() => {
+          setMembersDocument(null)
+          setDocumentAddSelected(new Set())
+        }}
+      >
+        <div className="flex flex-1 flex-col gap-4">
+          {formError ? <Alert>{formError}</Alert> : null}
+          {documentAddCandidates.length === 0 ? (
+            <p className="text-sm text-muted">Everyone in this space already has access.</p>
+          ) : (
+            documentAddCandidates.map((member) => {
+              const checked = documentAddSelected.has(member.id)
+              return (
+                <label
+                  key={member.id}
+                  className={cn(
+                    'flex cursor-pointer items-center gap-3 rounded-2xl border border-line bg-surface-2 px-3.5 py-3',
+                    checked && 'border-accent/40 bg-accent-soft',
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleDocumentAddMember(member.id)}
+                    className="size-4 accent-[var(--color-accent)]"
+                  />
+                  <Avatar name={member.full_name} email={member.email} imageUrl={member.avatar_url} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-ink">
+                      {member.full_name || 'Unnamed'}
+                    </span>
+                    <span className="block truncate text-xs text-muted">{member.email}</span>
+                  </span>
+                </label>
+              )
+            })
+          )}
+          <div className="mt-auto flex gap-3 border-t border-line pt-5">
+            <Button
+              type="button"
+              variant="secondary"
+              className="flex-1"
+              onClick={() => {
+                setMembersDocument(null)
+                setDocumentAddSelected(new Set())
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="flex-[1.3]"
+              disabled={submitting || documentAddSelected.size === 0}
+              onClick={() => void handleAddDocumentMembers()}
+            >
+              {submitting ? 'Sharing…' : 'Share'}
             </Button>
           </div>
         </div>

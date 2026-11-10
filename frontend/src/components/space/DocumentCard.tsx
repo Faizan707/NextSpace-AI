@@ -1,17 +1,20 @@
-import { FiClock, FiDownload, FiEye } from 'react-icons/fi'
+import { FiClock, FiDownload, FiEye, FiShield } from 'react-icons/fi'
 import { Avatar } from '../Avatar'
 import { ContextMenu } from '../ui'
-import type { SpaceDocument } from '../../types'
+import type { DocumentComplianceStatus, SpaceDocument } from '../../types'
 import { formatBytes, formatDate } from './format'
 import { MoreIcon, PlusIcon } from './icons'
 import { cn } from '../../lib/cn'
 
 interface DocumentCardProps {
   document: SpaceDocument
-  onUploadAnother: () => void
+  canManage?: boolean
+  compliancePending?: boolean
+  onAddMembers: (document: SpaceDocument) => void
   onPreview: (document: SpaceDocument) => void
   onDownload: (document: SpaceDocument) => void
   onDelete: (document: SpaceDocument) => void
+  onComplianceCheck: (document: SpaceDocument) => void
 }
 
 function fileMeta(name: string, contentType: string | null) {
@@ -73,16 +76,85 @@ function displayTitle(name: string) {
   return name.slice(0, dot)
 }
 
+function complianceMeta(status?: DocumentComplianceStatus | string) {
+  switch (status) {
+    case 'passed':
+      return {
+        label: 'Passed',
+        className: 'bg-teal-soft text-teal',
+      }
+    case 'failed':
+      return {
+        label: 'Failed',
+        className: 'bg-danger-soft text-danger',
+      }
+    case 'error':
+      return {
+        label: 'Error',
+        className: 'bg-danger-soft text-danger',
+      }
+    default:
+      return {
+        label: 'Pending',
+        className: 'bg-bg-elevated text-muted',
+      }
+  }
+}
+
 export function DocumentCard({
   document,
-  onUploadAnother,
+  canManage = false,
+  compliancePending = false,
+  onAddMembers,
   onPreview,
   onDownload,
   onDelete,
+  onComplianceCheck,
 }: DocumentCardProps) {
   const uploadedLabel = formatDate(document.created_at) || 'recently'
   const meta = fileMeta(document.original_name, document.content_type)
+  const compliance = complianceMeta(document.compliance_status)
   const title = displayTitle(document.original_name)
+  const people =
+    document.members && document.members.length > 0
+      ? document.members
+      : [document.uploaded_by]
+  const preview = people.slice(0, 3)
+  const extra = Math.max(people.length - preview.length, 0)
+  const menuItems = [
+    {
+      id: 'preview',
+      label: 'Preview',
+      onSelect: () => onPreview(document),
+    },
+    {
+      id: 'download',
+      label: 'Download',
+      onSelect: () => onDownload(document),
+    },
+    {
+      id: 'compliance',
+      label: compliancePending ? 'Checking…' : 'Run compliance check',
+      onSelect: () => {
+        if (!compliancePending) onComplianceCheck(document)
+      },
+    },
+    ...(canManage
+      ? [
+          {
+            id: 'add-members',
+            label: 'Add members',
+            onSelect: () => onAddMembers(document),
+          },
+          {
+            id: 'delete',
+            label: 'Delete',
+            danger: true,
+            onSelect: () => onDelete(document),
+          },
+        ]
+      : []),
+  ]
 
   return (
     <article className="relative flex h-[300px] w-[320px] flex-col rounded-[24px] border border-line bg-surface p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] transition hover:shadow-[var(--shadow-panel)]">
@@ -102,14 +174,26 @@ export function DocumentCard({
             <span className="text-placeholder">•</span>
             <span className="normal-case tracking-normal">{formatBytes(document.size_bytes)}</span>
           </p>
-          <span
-            className={cn(
-              'mt-1.5 inline-flex rounded-lg px-2 py-1 text-[0.7rem] font-semibold uppercase',
-              meta.badgeClass,
-            )}
-          >
-            {meta.label}
-          </span>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <span
+              className={cn(
+                'inline-flex rounded-lg px-2 py-1 text-[0.7rem] font-semibold uppercase',
+                meta.badgeClass,
+              )}
+            >
+              {meta.label}
+            </span>
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[0.7rem] font-semibold',
+                compliance.className,
+              )}
+              title={document.compliance_summary || undefined}
+            >
+              <FiShield size={11} aria-hidden />
+              {compliancePending ? 'Checking…' : compliance.label}
+            </span>
+          </div>
         </div>
 
         <ContextMenu
@@ -126,32 +210,15 @@ export function DocumentCard({
               <MoreIcon />
             </button>
           )}
-          items={[
-            {
-              id: 'preview',
-              label: 'Preview',
-              onSelect: () => onPreview(document),
-            },
-            {
-              id: 'download',
-              label: 'Download',
-              onSelect: () => onDownload(document),
-            },
-            {
-              id: 'delete',
-              label: 'Delete',
-              danger: true,
-              onSelect: () => onDelete(document),
-            },
-          ]}
+          items={menuItems}
         />
       </div>
 
-      <div className="mt-5 min-w-0 flex-1">
+      <div className="mt-5 min-w-0 flex-1 overflow-hidden">
         <button
           type="button"
           onClick={() => onPreview(document)}
-          className="m-0 cursor-pointer break-words text-left font-display text-base font-bold leading-snug tracking-tight text-ink transition hover:text-accent"
+          className="m-0 block w-full max-w-full cursor-pointer overflow-hidden text-left font-display text-base font-bold leading-snug tracking-tight text-ink transition [overflow-wrap:anywhere] [word-break:break-word] hover:text-accent line-clamp-3"
           title={`Preview ${document.original_name}`}
         >
           {title}
@@ -160,26 +227,41 @@ export function DocumentCard({
           <FiClock size={14} className="shrink-0 text-accent/70" aria-hidden />
           Uploaded {uploadedLabel}
         </p>
+        {document.compliance_summary ? (
+          <p className="mt-2 line-clamp-2 text-xs text-muted" title={document.compliance_summary}>
+            {document.compliance_summary}
+          </p>
+        ) : null}
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-4">
         <div className="flex items-center">
-          <Avatar
-            name={document.uploaded_by.full_name}
-            email={document.uploaded_by.email}
-            imageUrl={document.uploaded_by.avatar_url}
-            title={document.uploaded_by.full_name || document.uploaded_by.email}
-            className="ring-2 ring-surface"
-          />
-          <button
-            type="button"
-            title="Upload another"
-            aria-label="Upload another document"
-            onClick={onUploadAnother}
-            className="ml-[-8px] grid size-9 cursor-pointer place-items-center rounded-full border-2 border-dashed border-line bg-surface text-muted transition hover:z-10 hover:border-accent hover:text-accent active:scale-95"
-          >
-            <PlusIcon />
-          </button>
+          {preview.map((person, index) => (
+            <Avatar
+              key={person.id}
+              name={person.full_name}
+              email={person.email}
+              imageUrl={person.avatar_url}
+              title={person.full_name || person.email}
+              className={cn('ring-2 ring-surface', index === 0 ? undefined : 'ml-[-8px]')}
+            />
+          ))}
+          {extra > 0 ? (
+            <span className="ml-[-8px] grid size-9 place-items-center rounded-full bg-bg-elevated text-[0.7rem] font-bold text-muted ring-2 ring-surface">
+              +{extra}
+            </span>
+          ) : null}
+          {canManage ? (
+            <button
+              type="button"
+              title="Add members"
+              aria-label={`Add members to ${document.original_name}`}
+              onClick={() => onAddMembers(document)}
+              className="ml-[-8px] grid size-9 cursor-pointer place-items-center rounded-full border-2 border-dashed border-line bg-surface text-muted transition hover:z-10 hover:border-accent hover:text-accent active:scale-95"
+            >
+              <PlusIcon />
+            </button>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-1.5">

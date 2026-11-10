@@ -8,6 +8,7 @@ import { AdminSpacesPage } from './pages/admin/AdminSpacesPage'
 import { AdminUsersPage } from './pages/admin/AdminUsersPage'
 import { CompanyPage } from './pages/CompanyPage'
 import { DashboardHomePage } from './pages/DashboardHomePage'
+import { InboxPage } from './pages/InboxPage'
 import { LandingPage } from './pages/LandingPage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
@@ -34,6 +35,7 @@ export default function App() {
             <Route path="spaces/:spaceId/projects/:projectId" element={<ProjectDetailPage />} />
             <Route path="projects" element={<ProjectsPage />} />
             <Route path="tasks" element={<TasksPage />} />
+            <Route path="inbox" element={<InboxPage />} />
             <Route path="company" element={<CompanyPage />} />
           </Route>
           <Route path="/app/admin" element={<AdminShell />}>

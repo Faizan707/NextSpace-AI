@@ -1,5 +1,11 @@
+from app.models.chat import (
+    Conversation,
+    ConversationParticipant,
+    Message,
+    Notification,
+)
 from app.models.company import Company
-from app.models.document import Document
+from app.models.document import Document, DocumentMember
 from app.models.invite import Invite, InviteStatus
 from app.models.project import (
     Project,
@@ -18,9 +24,14 @@ from app.models.user import User, UserRole
 
 __all__ = [
     "Company",
+    "Conversation",
+    "ConversationParticipant",
     "Document",
+    "DocumentMember",
     "Invite",
     "InviteStatus",
+    "Message",
+    "Notification",
     "Project",
     "ProjectMember",
     "ProjectStage",

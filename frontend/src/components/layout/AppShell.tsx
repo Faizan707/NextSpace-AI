@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { useCompanyQuery, useSpacesQuery } from '../../hooks'
+import { useCompanyQuery, useRealtime, useSpacesQuery } from '../../hooks'
 import { useAuthStore } from '../../stores/authStore'
 import { cn } from '../../lib/cn'
+import { NotificationBell } from './NotificationBell'
 import { UserMenu } from './UserMenu'
 
 const navItems = [
@@ -10,6 +11,7 @@ const navItems = [
   { to: '/app/spaces', label: 'Spaces', end: false, icon: '◇' },
   { to: '/app/projects', label: 'Projects', end: false, icon: '▣' },
   { to: '/app/tasks', label: 'Tasks', end: false, icon: '✓' },
+  { to: '/app/inbox', label: 'Inbox', end: false, icon: '✉' },
 ]
 
 export function AppShell() {
@@ -21,6 +23,7 @@ export function AppShell() {
   // Warm cache for common routes while shell is mounted
   useSpacesQuery()
   useCompanyQuery()
+  useRealtime()
   const [mobileNav, setMobileNav] = useState(false)
 
   useEffect(() => {
@@ -83,7 +86,10 @@ export function AppShell() {
             </div>
           </div>
 
-          <UserMenu user={user} onLogout={handleLogout} />
+          <div className="flex shrink-0 items-center gap-2">
+            <NotificationBell />
+            <UserMenu user={user} onLogout={handleLogout} />
+          </div>
         </header>
 
         {mobileNav ? (

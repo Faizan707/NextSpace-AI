@@ -7,6 +7,7 @@ import { cn } from '../../lib/cn'
 
 interface ProjectCardProps {
   project: SpaceProject
+  canManage?: boolean
   onOpen: (project: SpaceProject) => void
   onEdit: (project: SpaceProject) => void
   onAddMembers: (project: SpaceProject) => void
@@ -48,7 +49,14 @@ function statusMeta(status: ProjectStatus, deadline: string | null) {
   }
 }
 
-export function ProjectCard({ project, onOpen, onEdit, onAddMembers, onDelete }: ProjectCardProps) {
+export function ProjectCard({
+  project,
+  canManage = false,
+  onOpen,
+  onEdit,
+  onAddMembers,
+  onDelete,
+}: ProjectCardProps) {
   const createdLabel = formatDate(project.created_at) || '—'
   const deadlineLabel = formatDate(project.deadline) || 'Not set'
   const people = project.members?.length > 0 ? project.members : [project.created_by]
@@ -57,6 +65,26 @@ export function ProjectCard({ project, onOpen, onEdit, onAddMembers, onDelete }:
   const memberLabel = `${people.length} member${people.length === 1 ? '' : 's'}`
   const status = statusMeta(project.status, project.deadline)
   const progress = Math.max(0, Math.min(100, project.progress ?? 0))
+  const menuItems = canManage
+    ? [
+        {
+          id: 'edit',
+          label: 'Edit',
+          onSelect: () => onEdit(project),
+        },
+        {
+          id: 'add-members',
+          label: 'Add members',
+          onSelect: () => onAddMembers(project),
+        },
+        {
+          id: 'delete',
+          label: 'Delete',
+          danger: true,
+          onSelect: () => onDelete(project),
+        },
+      ]
+    : []
 
   return (
     <article className="relative flex w-[320px] flex-col rounded-[24px] border border-line bg-surface p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] transition hover:shadow-[var(--shadow-panel)]">
@@ -76,39 +104,24 @@ export function ProjectCard({ project, onOpen, onEdit, onAddMembers, onDelete }:
           </span>
         </div>
 
-        <ContextMenu
-          align="end"
-          trigger={({ open, props }) => (
-            <button
-              {...props}
-              aria-label={`Project actions for ${project.name}`}
-              className={cn(
-                'grid size-8 cursor-pointer place-items-center rounded-full text-muted transition hover:bg-surface-2 hover:text-ink',
-                open && 'bg-surface-2 text-ink',
-              )}
-            >
-              <MoreIcon />
-            </button>
-          )}
-          items={[
-            {
-              id: 'edit',
-              label: 'Edit',
-              onSelect: () => onEdit(project),
-            },
-            {
-              id: 'add-members',
-              label: 'Add members',
-              onSelect: () => onAddMembers(project),
-            },
-            {
-              id: 'delete',
-              label: 'Delete',
-              danger: true,
-              onSelect: () => onDelete(project),
-            },
-          ]}
-        />
+        {menuItems.length > 0 ? (
+          <ContextMenu
+            align="end"
+            trigger={({ open, props }) => (
+              <button
+                {...props}
+                aria-label={`Project actions for ${project.name}`}
+                className={cn(
+                  'grid size-8 cursor-pointer place-items-center rounded-full text-muted transition hover:bg-surface-2 hover:text-ink',
+                  open && 'bg-surface-2 text-ink',
+                )}
+              >
+                <MoreIcon />
+              </button>
+            )}
+            items={menuItems}
+          />
+        ) : null}
       </div>
 
       <h3 className="mt-4 m-0 line-clamp-2 font-display text-[1.35rem] font-bold leading-tight text-teal">
@@ -172,17 +185,19 @@ export function ProjectCard({ project, onOpen, onEdit, onAddMembers, onDelete }:
               +{extraCount}
             </span>
           ) : null}
-          <Button
-            type="button"
-            variant="secondary"
-            size="icon"
-            className="ml-[-8px] border-dashed"
-            aria-label="Add member"
-            title="Add member"
-            onClick={() => onAddMembers(project)}
-          >
-            <PlusIcon />
-          </Button>
+          {canManage ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              className="ml-[-8px] border-dashed"
+              aria-label="Add member"
+              title="Add member"
+              onClick={() => onAddMembers(project)}
+            >
+              <PlusIcon />
+            </Button>
+          ) : null}
         </div>
 
         <button

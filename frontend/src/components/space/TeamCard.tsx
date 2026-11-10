@@ -6,15 +6,31 @@ import { cn } from '../../lib/cn'
 
 interface TeamCardProps {
   team: SpaceTeam
+  canManage?: boolean
   onAddMembers: (team: SpaceTeam) => void
   onDelete: (team: SpaceTeam) => void
 }
 
-export function TeamCard({ team, onAddMembers, onDelete }: TeamCardProps) {
+export function TeamCard({ team, canManage = false, onAddMembers, onDelete }: TeamCardProps) {
   const people = team.members.length > 0 ? team.members : [team.created_by]
   const preview = people.slice(0, 3)
   const extraCount = Math.max(people.length - preview.length, 0)
   const memberLabel = `${people.length} member${people.length === 1 ? '' : 's'}`
+  const menuItems = canManage
+    ? [
+        {
+          id: 'add-members',
+          label: 'Add members',
+          onSelect: () => onAddMembers(team),
+        },
+        {
+          id: 'delete',
+          label: 'Delete',
+          danger: true,
+          onSelect: () => onDelete(team),
+        },
+      ]
+    : []
 
   return (
     <article
@@ -33,34 +49,24 @@ export function TeamCard({ team, onAddMembers, onDelete }: TeamCardProps) {
             <span className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Team</span>
           </div>
 
-          <ContextMenu
-            align="end"
-            trigger={({ open, props }) => (
-              <button
-                {...props}
-                aria-label={`Team actions for ${team.name}`}
-                className={cn(
-                  'grid size-8 cursor-pointer place-items-center rounded-full text-muted transition hover:bg-surface-2 hover:text-ink',
-                  open && 'bg-surface-2 text-ink',
-                )}
-              >
-                <MoreIcon />
-              </button>
-            )}
-            items={[
-              {
-                id: 'add-members',
-                label: 'Add members',
-                onSelect: () => onAddMembers(team),
-              },
-              {
-                id: 'delete',
-                label: 'Delete',
-                danger: true,
-                onSelect: () => onDelete(team),
-              },
-            ]}
-          />
+          {menuItems.length > 0 ? (
+            <ContextMenu
+              align="end"
+              trigger={({ open, props }) => (
+                <button
+                  {...props}
+                  aria-label={`Team actions for ${team.name}`}
+                  className={cn(
+                    'grid size-8 cursor-pointer place-items-center rounded-full text-muted transition hover:bg-surface-2 hover:text-ink',
+                    open && 'bg-surface-2 text-ink',
+                  )}
+                >
+                  <MoreIcon />
+                </button>
+              )}
+              items={menuItems}
+            />
+          ) : null}
         </div>
 
         <h3 className="m-0 line-clamp-2 font-display text-2xl font-bold tracking-tight text-ink">
@@ -103,15 +109,17 @@ export function TeamCard({ team, onAddMembers, onDelete }: TeamCardProps) {
               +{extraCount}
             </span>
           ) : null}
-          <button
-            type="button"
-            title="Add member"
-            aria-label={`Add member to ${team.name}`}
-            onClick={() => onAddMembers(team)}
-            className="ml-[-8px] grid size-9 cursor-pointer place-items-center rounded-full border-2 border-dashed border-line bg-surface text-muted shadow-sm transition hover:z-10 hover:scale-110 hover:border-accent hover:text-accent active:scale-95"
-          >
-            <PlusIcon />
-          </button>
+          {canManage ? (
+            <button
+              type="button"
+              title="Add member"
+              aria-label={`Add member to ${team.name}`}
+              onClick={() => onAddMembers(team)}
+              className="ml-[-8px] grid size-9 cursor-pointer place-items-center rounded-full border-2 border-dashed border-line bg-surface text-muted shadow-sm transition hover:z-10 hover:scale-110 hover:border-accent hover:text-accent active:scale-95"
+            >
+              <PlusIcon />
+            </button>
+          ) : null}
         </div>
       </div>
     </article>

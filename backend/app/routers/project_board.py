@@ -18,6 +18,7 @@ from app.schemas.board import (
 )
 from app.schemas.project import ProjectRead
 from app.schemas.space import SpaceCreatorRead
+from app.services.notifications import notify_user
 from app.services.project_board import (
     ensure_default_stages,
     get_board,
@@ -27,7 +28,11 @@ from app.services.project_board import (
     next_task_position,
     recalculate_project_progress,
 )
-from app.services.space_access import get_accessible_space
+from app.services.space_access import (
+    get_accessible_space,
+    require_project_access,
+    require_project_write,
+)
 
 router = APIRouter(prefix="/spaces", tags=["project-board"])
 
@@ -85,8 +90,9 @@ def get_project(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> ProjectRead:
-    get_accessible_space(db, space_id, current_user)
+    space = get_accessible_space(db, space_id, current_user)
     project = _get_project_in_space(db, space_id, project_id)
+    require_project_access(current_user, space, project)
     return _to_read(project)
 
 
@@ -97,8 +103,9 @@ def read_board(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> BoardRead:
-    get_accessible_space(db, space_id, current_user)
-    _get_project_in_space(db, space_id, project_id)
+    space = get_accessible_space(db, space_id, current_user)
+    project = _get_project_in_space(db, space_id, project_id)
+    require_project_access(current_user, space, project)
     return get_board(db, project_id)
 
 
@@ -114,8 +121,9 @@ def create_stage(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> StageRead:
-    get_accessible_space(db, space_id, current_user)
-    _get_project_in_space(db, space_id, project_id)
+    space = get_accessible_space(db, space_id, current_user)
+    project = _get_project_in_space(db, space_id, project_id)
+    require_project_write(current_user, space, project)
     ensure_default_stages(db, project_id)
 
     stage = ProjectStage(
@@ -139,8 +147,9 @@ def update_stage(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> StageRead:
-    get_accessible_space(db, space_id, current_user)
-    _get_project_in_space(db, space_id, project_id)
+    space = get_accessible_space(db, space_id, current_user)
+    project = _get_project_in_space(db, space_id, project_id)
+    require_project_write(current_user, space, project)
     stage = get_stage_in_project(db, project_id, stage_id)
     if stage is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stage not found")
@@ -169,8 +178,9 @@ def delete_stage(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> None:
-    get_accessible_space(db, space_id, current_user)
-    _get_project_in_space(db, space_id, project_id)
+    space = get_accessible_space(db, space_id, current_user)
+    project = _get_project_in_space(db, space_id, project_id)
+    require_project_write(current_user, space, project)
     stage = get_stage_in_project(db, project_id, stage_id)
     if stage is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stage not found")
@@ -205,8 +215,9 @@ def create_task(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> TaskRead:
-    get_accessible_space(db, space_id, current_user)
+    space = get_accessible_space(db, space_id, current_user)
     project = _get_project_in_space(db, space_id, project_id)
+    require_project_write(current_user, space, project)
     ensure_default_stages(db, project_id)
 
     stage = get_stage_in_project(db, project_id, payload.stage_id)
@@ -228,6 +239,19 @@ def create_task(
     db.add(task)
     db.flush()
     recalculate_project_progress(db, project_id)
+
+    if payload.assignee_id is not None:
+        actor_label = current_user.full_name or current_user.email
+        notify_user(
+            db,
+            user_id=payload.assignee_id,
+            actor_id=current_user.id,
+            type="task_assigned",
+            title=f"Assigned to “{task.title}”",
+            body=f"{actor_label} assigned you this task.",
+            link=f"/app/spaces/{space_id}/projects/{project_id}",
+        )
+
     db.commit()
     created = get_task_in_project(db, project_id, task.id)
     return _task_to_read(created)
@@ -242,8 +266,9 @@ def update_task(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> TaskRead:
-    get_accessible_space(db, space_id, current_user)
+    space = get_accessible_space(db, space_id, current_user)
     project = _get_project_in_space(db, space_id, project_id)
+    require_project_write(current_user, space, project)
     task = get_task_in_project(db, project_id, task_id)
     if task is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
@@ -259,6 +284,7 @@ def update_task(
         if data["stage_id"] != task.stage_id and "position" not in data:
             data["position"] = next_task_position(db, data["stage_id"])
 
+    previous_assignee_id = task.assignee_id
     if "assignee_id" in data:
         _assert_assignee_on_project(project, data["assignee_id"])
 
@@ -267,6 +293,24 @@ def update_task(
 
     db.flush()
     recalculate_project_progress(db, project_id)
+
+    new_assignee_id = task.assignee_id
+    if (
+        "assignee_id" in data
+        and new_assignee_id is not None
+        and new_assignee_id != previous_assignee_id
+    ):
+        actor_label = current_user.full_name or current_user.email
+        notify_user(
+            db,
+            user_id=new_assignee_id,
+            actor_id=current_user.id,
+            type="task_assigned",
+            title=f"Assigned to “{task.title}”",
+            body=f"{actor_label} assigned you this task.",
+            link=f"/app/spaces/{space_id}/projects/{project_id}",
+        )
+
     db.commit()
     updated = get_task_in_project(db, project_id, task.id)
     return _task_to_read(updated)
@@ -283,8 +327,9 @@ def delete_task(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> None:
-    get_accessible_space(db, space_id, current_user)
-    _get_project_in_space(db, space_id, project_id)
+    space = get_accessible_space(db, space_id, current_user)
+    project = _get_project_in_space(db, space_id, project_id)
+    require_project_write(current_user, space, project)
     task = get_task_in_project(db, project_id, task_id)
     if task is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")

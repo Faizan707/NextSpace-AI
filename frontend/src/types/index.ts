@@ -140,6 +140,14 @@ export interface SpaceTeam {
   created_at: string
 }
 
+export type DocumentComplianceStatus = 'pending' | 'passed' | 'failed' | 'error'
+
+export interface DocumentComplianceFinding {
+  severity: 'high' | 'medium' | 'low' | 'info' | string
+  code: string
+  message: string
+}
+
 export interface SpaceDocument {
   id: number
   space_id: number
@@ -148,7 +156,14 @@ export interface SpaceDocument {
   size_bytes: number
   uploaded_by_id: number
   uploaded_by: SpaceCreator
+  members?: SpaceCreator[]
   created_at: string
+  compliance_status?: DocumentComplianceStatus | string
+  compliance_summary?: string | null
+  compliance_score?: number | null
+  compliance_findings?: DocumentComplianceFinding[]
+  compliance_checked_at?: string | null
+  compliance_engine?: string | null
 }
 
 export type TaskPriority = 'low' | 'medium' | 'high'
@@ -235,4 +250,40 @@ export interface WorkTask {
   created_by: SpaceCreator
   created_at: string
   updated_at: string
+}
+
+export type NotificationType =
+  | 'task_assigned'
+  | 'space_added'
+  | 'project_added'
+  | 'chat_message'
+
+export interface ChatMessage {
+  id: number
+  conversation_id: number
+  sender_id: number
+  sender: SpaceCreator
+  body: string
+  created_at: string
+}
+
+export interface Conversation {
+  id: number
+  company_id: number
+  other_user: SpaceCreator
+  last_message: ChatMessage | null
+  created_at: string
+}
+
+export interface AppNotification {
+  id: number
+  user_id: number
+  actor_id: number | null
+  actor: SpaceCreator | null
+  type: NotificationType | string
+  title: string
+  body: string | null
+  link: string | null
+  read_at: string | null
+  created_at: string
 }

@@ -7,12 +7,13 @@ import {
   useAddSpaceMembersMutation,
   useCreateSpaceMutation,
   useDeleteSpaceMutation,
+  useRemoveSpaceMemberMutation,
   useSpacesQuery,
   useUpdateSpaceMutation,
 } from '../hooks'
 import { useAuthStore } from '../stores/authStore'
 import { toast } from '../stores/toastStore'
-import type { Space, SpacePayload } from '../types'
+import type { Space, SpaceCreator, SpacePayload } from '../types'
 
 export function SpacesPage() {
   const user = useAuthStore((s) => s.user)
@@ -21,16 +22,19 @@ export function SpacesPage() {
   const updateSpace = useUpdateSpaceMutation()
   const deleteSpace = useDeleteSpaceMutation()
   const addMembers = useAddSpaceMembersMutation()
+  const removeMember = useRemoveSpaceMemberMutation()
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editing, setEditing] = useState<Space | null>(null)
   const [membersSpace, setMembersSpace] = useState<Space | null>(null)
+  const [removingMemberId, setRemovingMemberId] = useState<number | null>(null)
 
   const submitting =
     createSpace.isPending ||
     updateSpace.isPending ||
     deleteSpace.isPending ||
-    addMembers.isPending
+    addMembers.isPending ||
+    removeMember.isPending
 
   function openCreate() {
     setEditing(null)
@@ -67,8 +71,33 @@ export function SpacesPage() {
 
   async function handleAddMembers(userIds: number[]) {
     if (!membersSpace) return
-    await addMembers.mutateAsync({ spaceId: membersSpace.id, userIds })
-    setMembersSpace(null)
+    const updated = await addMembers.mutateAsync({ spaceId: membersSpace.id, userIds })
+    setMembersSpace(updated)
+    toast.success('Members added')
+  }
+
+  async function handleRemoveMember(member: SpaceCreator) {
+    if (!membersSpace) return
+    if (
+      !window.confirm(
+        `Remove ${member.full_name || member.email} from this space? They will also lose project and team access here.`,
+      )
+    ) {
+      return
+    }
+    setRemovingMemberId(member.id)
+    try {
+      const updated = await removeMember.mutateAsync({
+        spaceId: membersSpace.id,
+        userId: member.id,
+      })
+      setMembersSpace(updated)
+      toast.success('Member removed', member.full_name || member.email)
+    } catch (err) {
+      toast.error('Failed to remove member', err instanceof Error ? err.message : undefined)
+    } finally {
+      setRemovingMemberId(null)
+    }
   }
 
   async function handleDelete(space: Space) {
@@ -144,9 +173,14 @@ export function SpacesPage() {
       <AddSpaceMembersDrawer
         open={Boolean(membersSpace)}
         space={membersSpace}
-        submitting={addMembers.isPending}
-        onClose={() => setMembersSpace(null)}
+        submitting={addMembers.isPending || removeMember.isPending}
+        removingId={removingMemberId}
+        onClose={() => {
+          setMembersSpace(null)
+          setRemovingMemberId(null)
+        }}
         onSubmit={handleAddMembers}
+        onRemove={handleRemoveMember}
       />
     </div>
   )

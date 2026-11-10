@@ -4,12 +4,19 @@ import { TeamCard } from './TeamCard'
 
 interface TeamsSectionProps {
   teams: SpaceTeam[]
+  canManageTeam?: (team: SpaceTeam) => boolean
   onCreate: () => void
   onAddMembers: (team: SpaceTeam) => void
   onDelete: (team: SpaceTeam) => void
 }
 
-export function TeamsSection({ teams, onCreate, onAddMembers, onDelete }: TeamsSectionProps) {
+export function TeamsSection({
+  teams,
+  canManageTeam,
+  onCreate,
+  onAddMembers,
+  onDelete,
+}: TeamsSectionProps) {
   return (
     <section className="fade-up-delay">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
@@ -32,6 +39,7 @@ export function TeamsSection({ teams, onCreate, onAddMembers, onDelete }: TeamsS
             <TeamCard
               key={team.id}
               team={team}
+              canManage={canManageTeam?.(team) ?? false}
               onAddMembers={onAddMembers}
               onDelete={onDelete}
             />

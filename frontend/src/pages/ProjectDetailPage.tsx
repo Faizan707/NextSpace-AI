@@ -1,24 +1,34 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { FiPlus } from 'react-icons/fi'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { KanbanBoard } from '../components/project/KanbanBoard'
 import { TaskDrawer, type TaskFormPayload } from '../components/project/TaskDrawer'
 import { TaskViewDrawer } from '../components/project/TaskViewDrawer'
-import { Alert, Button, ProjectDetailSkeleton } from '../components/ui'
+import {
+  AddProjectMembersPicker,
+  countProjectAddSelection,
+} from '../components/space/AddProjectMembersPicker'
+import { Alert, Breadcrumbs, Button, Drawer, ProjectDetailSkeleton } from '../components/ui'
 import {
   setBoardStages,
+  useAddProjectMembersMutation,
   useCreateStageMutation,
   useCreateTaskMutation,
   useDeleteStageMutation,
   useDeleteTaskMutation,
   useProjectBoardQuery,
   useProjectQuery,
+  useRemoveProjectMemberMutation,
+  useSpaceQuery,
+  useSpaceTeamsQuery,
   useUpdateStageMutation,
   useUpdateTaskMutation,
 } from '../hooks'
+import { useAuthStore } from '../stores/authStore'
 import { toast } from '../stores/toastStore'
-import type { ProjectStage, ProjectTask } from '../types'
+import type { ProjectStage, ProjectTask, SpaceCreator } from '../types'
 import { cn } from '../lib/cn'
 
 export function ProjectDetailPage() {
@@ -30,7 +40,10 @@ export function ProjectDetailPage() {
   const projectId = Number(projectIdParam)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const currentUser = useAuthStore((s) => s.user)
 
+  const spaceQuery = useSpaceQuery(spaceId)
+  const teamsQuery = useSpaceTeamsQuery(spaceId)
   const projectQuery = useProjectQuery(spaceId, projectId)
   const boardQuery = useProjectBoardQuery(spaceId, projectId)
   const createTask = useCreateTaskMutation(spaceId, projectId)
@@ -39,7 +52,11 @@ export function ProjectDetailPage() {
   const createStage = useCreateStageMutation(spaceId, projectId)
   const updateStage = useUpdateStageMutation(spaceId, projectId)
   const deleteStage = useDeleteStageMutation(spaceId, projectId)
+  const addProjectMembers = useAddProjectMembersMutation(spaceId)
+  const removeProjectMember = useRemoveProjectMemberMutation(spaceId)
 
+  const space = spaceQuery.data ?? null
+  const teams = teamsQuery.data ?? []
   const project = projectQuery.data ?? null
   const stages = boardQuery.data?.stages ?? []
   const loading = (projectQuery.isLoading || boardQuery.isLoading) && !project
@@ -53,6 +70,11 @@ export function ProjectDetailPage() {
   const [editingTask, setEditingTask] = useState<ProjectTask | null>(null)
   const [viewTaskId, setViewTaskId] = useState<number | null>(null)
   const [viewDrawerOpen, setViewDrawerOpen] = useState(false)
+  const [membersOpen, setMembersOpen] = useState(false)
+  const [memberSelected, setMemberSelected] = useState<Set<number>>(new Set())
+  const [teamsSelected, setTeamsSelected] = useState<Set<number>>(new Set())
+  const [memberError, setMemberError] = useState<string | null>(null)
+  const [removingMemberId, setRemovingMemberId] = useState<number | null>(null)
 
   function openCreateTask(stageId: number) {
     setEditingTask(null)
@@ -159,6 +181,81 @@ export function ProjectDetailPage() {
     toast.success('Stage created', created.name)
   }
 
+  const people = project
+    ? project.members?.length > 0
+      ? project.members
+      : [project.created_by]
+    : []
+  const preview = people.slice(0, 4)
+  const extra = Math.max(people.length - preview.length, 0)
+
+  const existingMemberIds = useMemo(
+    () => new Set(people.map((member) => member.id)),
+    [people],
+  )
+
+  const addSelectionCount = useMemo(
+    () => countProjectAddSelection(memberSelected, teamsSelected, teams, existingMemberIds),
+    [memberSelected, teamsSelected, teams, existingMemberIds],
+  )
+
+  function resetMemberSelection() {
+    setMemberSelected(new Set())
+    setTeamsSelected(new Set())
+  }
+
+  function toggleMember(userId: number) {
+    setMemberSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(userId)) next.delete(userId)
+      else next.add(userId)
+      return next
+    })
+  }
+
+  function toggleTeam(teamId: number) {
+    setTeamsSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(teamId)) next.delete(teamId)
+      else next.add(teamId)
+      return next
+    })
+  }
+
+  async function handleAddMembers() {
+    if (memberSelected.size === 0 && teamsSelected.size === 0) return
+    setMemberError(null)
+    try {
+      await addProjectMembers.mutateAsync({
+        projectId,
+        userIds: [...memberSelected],
+        teamIds: [...teamsSelected],
+      })
+      toast.success(
+        addSelectionCount === 1 ? '1 member added' : `${addSelectionCount} members added`,
+      )
+      resetMemberSelection()
+    } catch (err) {
+      setMemberError(err instanceof Error ? err.message : 'Failed to add members')
+    }
+  }
+
+  async function handleRemoveMember(member: SpaceCreator) {
+    if (!window.confirm(`Remove ${member.full_name || member.email} from this project?`)) {
+      return
+    }
+    setMemberError(null)
+    setRemovingMemberId(member.id)
+    try {
+      await removeProjectMember.mutateAsync({ projectId, userId: member.id })
+      toast.success('Member removed', member.full_name || member.email)
+    } catch (err) {
+      setMemberError(err instanceof Error ? err.message : 'Failed to remove member')
+    } finally {
+      setRemovingMemberId(null)
+    }
+  }
+
   if (!Number.isFinite(spaceId) || !Number.isFinite(projectId)) {
     return <Alert>Invalid project.</Alert>
   }
@@ -178,19 +275,24 @@ export function ProjectDetailPage() {
     )
   }
 
-  const people = project.members?.length > 0 ? project.members : [project.created_by]
-  const preview = people.slice(0, 4)
-  const extra = Math.max(people.length - preview.length, 0)
+  const canManageMembers =
+    currentUser?.role === 'tenant_owner' ||
+    space?.created_by_id === currentUser?.id ||
+    project.created_by_id === currentUser?.id
+
+  const canEditBoard =
+    canManageMembers || people.some((member) => member.id === currentUser?.id)
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
       <section className="fade-up">
-        <Link
-          to={`/app/spaces/${spaceId}`}
-          className="text-sm font-semibold text-accent hover:underline"
-        >
-          ← Back to space
-        </Link>
+        <Breadcrumbs
+          items={[
+            { label: 'Spaces', to: '/app/spaces' },
+            { label: space?.name || 'Space', to: `/app/spaces/${spaceId}` },
+            { label: project.name },
+          ]}
+        />
         <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-[0.08em] text-accent">Project</p>
@@ -214,6 +316,35 @@ export function ProjectDetailPage() {
                 +{extra}
               </span>
             ) : null}
+            {canManageMembers ? (
+              <button
+                type="button"
+                title="Manage members"
+                aria-label="Manage project members"
+                onClick={() => {
+                  setMemberError(null)
+                  resetMemberSelection()
+                  setMembersOpen(true)
+                }}
+                className="ml-2 grid size-9 cursor-pointer place-items-center rounded-full border border-dashed border-line text-muted transition hover:border-accent hover:bg-accent-soft hover:text-accent"
+              >
+                <FiPlus size={16} aria-hidden />
+              </button>
+            ) : (
+              <button
+                type="button"
+                title="View members"
+                aria-label="View project members"
+                onClick={() => {
+                  setMemberError(null)
+                  resetMemberSelection()
+                  setMembersOpen(true)
+                }}
+                className="ml-2 text-xs font-semibold text-accent hover:underline"
+              >
+                Members
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -225,13 +356,16 @@ export function ProjectDetailPage() {
           <div>
             <h2 className="font-display text-xl font-bold text-ink">Board</h2>
             <p className="text-sm text-muted">
-              Default stages: Todo, In Progress, Done. Add custom stages anytime.
+              {canEditBoard
+                ? 'Default stages: Todo, In Progress, Done. Add custom stages anytime.'
+                : 'View only — you need to be a project member to create or edit tasks.'}
             </p>
           </div>
         </div>
 
         <KanbanBoard
           stages={stages}
+          canEdit={canEditBoard}
           onStagesChange={handleStagesChange}
           onAddTask={openCreateTask}
           onViewTask={openViewTask}
@@ -251,23 +385,124 @@ export function ProjectDetailPage() {
         taskId={viewTaskId}
         members={people}
         onClose={closeViewDrawer}
-        onEdit={() => {
-          const task =
-            stages.flatMap((stage) => stage.tasks).find((item) => item.id === viewTaskId) ?? null
-          if (task) openEditTask(task)
-        }}
+        {...(canEditBoard
+          ? {
+              onEdit: () => {
+                const task =
+                  stages.flatMap((stage) => stage.tasks).find((item) => item.id === viewTaskId) ??
+                  null
+                if (task) openEditTask(task)
+              },
+            }
+          : {})}
       />
 
-      <TaskDrawer
-        open={taskDrawerOpen}
-        stages={stages}
-        members={people}
-        initialStageId={taskStageId}
-        editing={editingTask}
-        submitting={createTask.isPending || updateTask.isPending}
-        onClose={closeTaskDrawer}
-        onSubmit={handleSaveTask}
-      />
+      {canEditBoard ? (
+        <TaskDrawer
+          open={taskDrawerOpen}
+          stages={stages}
+          members={people}
+          initialStageId={taskStageId}
+          editing={editingTask}
+          submitting={createTask.isPending || updateTask.isPending}
+          onClose={closeTaskDrawer}
+          onSubmit={handleSaveTask}
+        />
+      ) : null}
+
+      <Drawer
+        open={membersOpen}
+        onClose={() => setMembersOpen(false)}
+        title="Project members"
+        description="Manage who can work on this project."
+        footer={
+          <>
+            <Button type="button" variant="ghost" onClick={() => setMembersOpen(false)}>
+              Close
+            </Button>
+            {canManageMembers ? (
+              <Button
+                type="button"
+                disabled={
+                  (memberSelected.size === 0 && teamsSelected.size === 0) ||
+                  addProjectMembers.isPending
+                }
+                onClick={() => void handleAddMembers()}
+              >
+                {addProjectMembers.isPending
+                  ? 'Adding…'
+                  : `Add${addSelectionCount > 0 ? ` (${addSelectionCount})` : ''}`}
+              </Button>
+            ) : null}
+          </>
+        }
+      >
+        {memberError ? <Alert className="mb-3">{memberError}</Alert> : null}
+
+        <div className="space-y-5">
+          <div>
+            <p className="mb-2 text-xs font-bold uppercase tracking-[0.08em] text-muted">
+              Current members
+            </p>
+            <ul className="space-y-2">
+              {people.map((member) => {
+                const isCreator = member.id === project.created_by_id
+                return (
+                  <li
+                    key={member.id}
+                    className="flex items-center gap-3 rounded-[var(--radius-md)] border border-line bg-surface px-3 py-2.5"
+                  >
+                    <Avatar
+                      name={member.full_name}
+                      email={member.email}
+                      imageUrl={member.avatar_url}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-ink">
+                        {member.full_name || 'Unnamed'}
+                        {isCreator ? (
+                          <span className="ml-1.5 text-[0.65rem] font-bold uppercase tracking-wide text-muted">
+                            Owner
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="block truncate text-xs text-muted">{member.email}</span>
+                    </span>
+                    {canManageMembers && !isCreator ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={removingMemberId === member.id || removeProjectMember.isPending}
+                        onClick={() => void handleRemoveMember(member)}
+                      >
+                        {removingMemberId === member.id ? '…' : 'Remove'}
+                      </Button>
+                    ) : null}
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+
+          {canManageMembers ? (
+            <div>
+              <p className="mb-2 text-xs font-bold uppercase tracking-[0.08em] text-muted">
+                Add from space
+              </p>
+              <AddProjectMembersPicker
+                people={space?.members ?? []}
+                teams={teams}
+                existingMemberIds={existingMemberIds}
+                selectedPeople={memberSelected}
+                selectedTeams={teamsSelected}
+                onTogglePerson={toggleMember}
+                onToggleTeam={toggleTeam}
+              />
+            </div>
+          ) : null}
+        </div>
+      </Drawer>
     </div>
   )
 }

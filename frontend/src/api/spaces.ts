@@ -110,12 +110,27 @@ export function addProjectMembers(
   token: string,
   spaceId: number,
   projectId: number,
-  userIds: number[],
+  payload: { userIds?: number[]; teamIds?: number[] },
 ) {
   return apiRequest<SpaceProject>(`/spaces/${spaceId}/projects/${projectId}/members`, {
     method: 'POST',
     token,
-    body: { user_ids: userIds },
+    body: {
+      user_ids: payload.userIds ?? [],
+      team_ids: payload.teamIds ?? [],
+    },
+  })
+}
+
+export function removeProjectMember(
+  token: string,
+  spaceId: number,
+  projectId: number,
+  userId: number,
+) {
+  return apiRequest<SpaceProject>(`/spaces/${spaceId}/projects/${projectId}/members/${userId}`, {
+    method: 'DELETE',
+    token,
   })
 }
 
@@ -398,11 +413,53 @@ export function uploadDocument(
   return apiUpload<SpaceDocument>(`/spaces/${spaceId}/documents`, file, token, 'file', onProgress)
 }
 
+export function addDocumentMembers(
+  token: string,
+  spaceId: number,
+  documentId: number,
+  userIds: number[],
+) {
+  return apiRequest<SpaceDocument>(`/spaces/${spaceId}/documents/${documentId}/members`, {
+    method: 'POST',
+    token,
+    body: { user_ids: userIds },
+  })
+}
+
+export function removeDocumentMember(
+  token: string,
+  spaceId: number,
+  documentId: number,
+  userId: number,
+) {
+  return apiRequest<SpaceDocument>(
+    `/spaces/${spaceId}/documents/${documentId}/members/${userId}`,
+    {
+      method: 'DELETE',
+      token,
+    },
+  )
+}
+
 export function deleteDocument(token: string, spaceId: number, documentId: number) {
   return apiRequest<void>(`/spaces/${spaceId}/documents/${documentId}`, {
     method: 'DELETE',
     token,
   })
+}
+
+export function runDocumentComplianceCheck(
+  token: string,
+  spaceId: number,
+  documentId: number,
+) {
+  return apiRequest<SpaceDocument>(
+    `/spaces/${spaceId}/documents/${documentId}/compliance-check`,
+    {
+      method: 'POST',
+      token,
+    },
+  )
 }
 
 export function documentDownloadUrl(spaceId: number, documentId: number) {

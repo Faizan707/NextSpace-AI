@@ -30,4 +30,13 @@ export const queryKeys = {
     overview: ['admin', 'overview'] as const,
     invites: ['admin', 'invites'] as const,
   },
+  inbox: {
+    directory: ['inbox', 'directory'] as const,
+    conversations: ['inbox', 'conversations'] as const,
+    messages: (conversationId: number) => ['inbox', 'conversations', conversationId, 'messages'] as const,
+  },
+  notifications: {
+    list: ['notifications'] as const,
+    unreadCount: ['notifications', 'unread-count'] as const,
+  },
 }

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 from app.models.space import SpaceType
 
@@ -46,3 +46,14 @@ class SpaceRead(BaseModel):
 
 class SpaceMembersAdd(BaseModel):
     user_ids: list[int] = Field(min_length=1)
+
+
+class ProjectMembersAdd(BaseModel):
+    user_ids: list[int] = Field(default_factory=list)
+    team_ids: list[int] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def require_users_or_teams(self) -> "ProjectMembersAdd":
+        if not self.user_ids and not self.team_ids:
+            raise ValueError("Provide at least one user_id or team_id")
+        return self

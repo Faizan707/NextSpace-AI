@@ -38,7 +38,7 @@ interface TaskViewDrawerProps {
   taskId: number | null
   members: SpaceCreator[]
   onClose: () => void
-  onEdit: () => void
+  onEdit?: () => void
 }
 
 function formatDateTime(value: string | null | undefined) {
@@ -418,7 +418,7 @@ export function TaskViewDrawer({
       title={task?.title || (loading ? 'Loading…' : 'Task')}
       onClose={onClose}
       headerExtra={
-        task ? (
+        task && onEdit ? (
           <button
             type="button"
             onClick={onEdit}
@@ -430,6 +430,7 @@ export function TaskViewDrawer({
         ) : null
       }
       footer={
+        onEdit ? (
         <form className="relative space-y-2" onSubmit={(event) => void handleSubmitComment(event)}>
           {replyTo ? (
             <div className="flex items-center justify-between gap-2 rounded-lg bg-bg-elevated px-3 py-2 text-xs text-muted">
@@ -521,6 +522,7 @@ export function TaskViewDrawer({
             <p className="text-xs text-muted">Uploading… {uploadPercent}%</p>
           ) : null}
         </form>
+        ) : null
       }
     >
       {error ? <Alert>{error}</Alert> : null}

@@ -1,5 +1,5 @@
 import { Avatar } from './Avatar'
-import { Drawer } from './ui'
+import { Button, Drawer } from './ui'
 import type { SpaceCreator } from '../types'
 import { cn } from '../lib/cn'
 
@@ -8,7 +8,11 @@ interface SpaceMembersDrawerProps {
   spaceName: string
   members: SpaceCreator[]
   selectedId?: number | null
+  canManage?: boolean
+  creatorId?: number | null
+  removingId?: number | null
   onSelect?: (member: SpaceCreator) => void
+  onRemove?: (member: SpaceCreator) => void
   onClose: () => void
 }
 
@@ -17,7 +21,11 @@ export function SpaceMembersDrawer({
   spaceName,
   members,
   selectedId,
+  canManage = false,
+  creatorId = null,
+  removingId = null,
   onSelect,
+  onRemove,
   onClose,
 }: SpaceMembersDrawerProps) {
   const selected = members.find((member) => member.id === selectedId) || members[0] || null
@@ -40,7 +48,7 @@ export function SpaceMembersDrawer({
                 imageUrl={selected.avatar_url}
                 className="size-12 text-base"
               />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="m-0 truncate font-display text-lg font-bold text-ink">
                   {selected.full_name || 'Unnamed member'}
                 </p>
@@ -63,6 +71,17 @@ export function SpaceMembersDrawer({
                 <dd className="mt-1 m-0 break-all text-sm font-semibold text-ink">{selected.email}</dd>
               </div>
             </dl>
+            {canManage && selected.id !== creatorId && onRemove ? (
+              <Button
+                type="button"
+                variant="secondary"
+                className="mt-4 w-full"
+                disabled={removingId === selected.id}
+                onClick={() => onRemove(selected)}
+              >
+                {removingId === selected.id ? 'Removing…' : 'Remove from space'}
+              </Button>
+            ) : null}
           </div>
         ) : null}
 
@@ -71,32 +90,53 @@ export function SpaceMembersDrawer({
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {members.map((member) => {
               const active = member.id === selected?.id
+              const isCreator = member.id === creatorId
               return (
                 <li key={member.id}>
-                  <button
-                    type="button"
-                    onClick={() => onSelect?.(member)}
+                  <div
                     className={cn(
-                      'flex w-full cursor-pointer items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition',
+                      'flex items-center gap-2 rounded-2xl border px-3 py-2.5 transition',
                       active
                         ? 'border-accent/30 bg-accent-soft/50'
                         : 'border-line bg-surface hover:border-accent/20 hover:bg-bg-elevated/60',
                     )}
                   >
-                    <Avatar
-                      name={member.full_name}
-                      email={member.email}
-                      imageUrl={member.avatar_url}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="m-0 truncate text-sm font-semibold text-ink">
-                        {member.full_name || 'Unnamed member'}
-                      </p>
-                      <p className="m-0 truncate text-xs text-muted">
-                        {member.job_role || member.email}
-                      </p>
-                    </div>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => onSelect?.(member)}
+                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left"
+                    >
+                      <Avatar
+                        name={member.full_name}
+                        email={member.email}
+                        imageUrl={member.avatar_url}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="m-0 truncate text-sm font-semibold text-ink">
+                          {member.full_name || 'Unnamed member'}
+                          {isCreator ? (
+                            <span className="ml-1.5 text-[0.65rem] font-bold uppercase tracking-wide text-muted">
+                              Owner
+                            </span>
+                          ) : null}
+                        </p>
+                        <p className="m-0 truncate text-xs text-muted">
+                          {member.job_role || member.email}
+                        </p>
+                      </div>
+                    </button>
+                    {canManage && !isCreator && onRemove ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={removingId === member.id}
+                        onClick={() => onRemove(member)}
+                      >
+                        {removingId === member.id ? '…' : 'Remove'}
+                      </Button>
+                    ) : null}
+                  </div>
                 </li>
               )
             })}
