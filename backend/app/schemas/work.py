@@ -43,3 +43,50 @@ class WorkTaskRead(BaseModel):
     created_by: SpaceCreatorRead
     created_at: datetime
     updated_at: datetime
+
+
+class DashboardKpis(BaseModel):
+    spaces: int
+    projects: int
+    teams: int
+    members: int
+    tasks_total: int
+    tasks_done: int
+    tasks_open: int
+    avg_project_progress: int
+
+
+class DashboardNamedCount(BaseModel):
+    name: str
+    value: int
+
+
+class DashboardProjectProgress(BaseModel):
+    name: str
+    space_name: str
+    progress: int
+
+
+class DashboardTeamPerformance(BaseModel):
+    name: str
+    space_name: str
+    members: int
+    assigned_tasks: int
+    done_tasks: int
+
+
+class DashboardMemberPerformance(BaseModel):
+    name: str
+    assigned: int
+    done: int
+    open: int
+
+
+class WorkDashboardRead(BaseModel):
+    kpis: DashboardKpis
+    tasks_by_priority: list[DashboardNamedCount]
+    tasks_by_status: list[DashboardNamedCount]
+    tasks_by_space: list[DashboardNamedCount]
+    project_progress: list[DashboardProjectProgress]
+    team_performance: list[DashboardTeamPerformance]
+    member_performance: list[DashboardMemberPerformance]

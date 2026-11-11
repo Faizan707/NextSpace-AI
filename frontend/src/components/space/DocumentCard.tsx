@@ -1,7 +1,13 @@
+import { useState } from 'react'
 import { FiClock, FiDownload, FiEye, FiShield } from 'react-icons/fi'
 import { Avatar } from '../Avatar'
 import { ContextMenu } from '../ui'
 import type { DocumentComplianceStatus, SpaceDocument } from '../../types'
+import {
+  ComplianceFindingsDialog,
+  ComplianceSummaryButton,
+  hasComplianceFindings,
+} from './ComplianceFindingsDialog'
 import { formatBytes, formatDate } from './format'
 import { MoreIcon, PlusIcon } from './icons'
 import { cn } from '../../lib/cn'
@@ -111,10 +117,12 @@ export function DocumentCard({
   onDelete,
   onComplianceCheck,
 }: DocumentCardProps) {
+  const [findingsOpen, setFindingsOpen] = useState(false)
   const uploadedLabel = formatDate(document.created_at) || 'recently'
   const meta = fileMeta(document.original_name, document.content_type)
   const compliance = complianceMeta(document.compliance_status)
   const title = displayTitle(document.original_name)
+  const canViewFindings = hasComplianceFindings(document)
   const people =
     document.members && document.members.length > 0
       ? document.members
@@ -132,6 +140,15 @@ export function DocumentCard({
       label: 'Download',
       onSelect: () => onDownload(document),
     },
+    ...(canViewFindings
+      ? [
+          {
+            id: 'findings',
+            label: 'View findings',
+            onSelect: () => setFindingsOpen(true),
+          },
+        ]
+      : []),
     {
       id: 'compliance',
       label: compliancePending ? 'Checking…' : 'Run compliance check',
@@ -157,134 +174,164 @@ export function DocumentCard({
   ]
 
   return (
-    <article className="relative flex h-[300px] w-[320px] flex-col rounded-[24px] border border-line bg-surface p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] transition hover:shadow-[var(--shadow-panel)]">
-      <div className="flex items-start gap-3">
-        <span
-          className={cn(
-            'grid size-11 shrink-0 place-items-center rounded-2xl font-display text-lg font-bold',
-            meta.iconClass,
-          )}
-        >
-          {meta.letter}
-        </span>
+    <>
+      <article className="relative flex h-[300px] w-[320px] flex-col rounded-[24px] border border-line bg-surface p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] transition hover:shadow-[var(--shadow-panel)]">
+        <div className="flex items-start gap-3">
+          <span
+            className={cn(
+              'grid size-11 shrink-0 place-items-center rounded-2xl font-display text-lg font-bold',
+              meta.iconClass,
+            )}
+          >
+            {meta.letter}
+          </span>
 
-        <div className="min-w-0 flex-1">
-          <p className="m-0 flex flex-wrap items-center gap-1.5 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-muted">
-            <span>Document</span>
-            <span className="text-placeholder">•</span>
-            <span className="normal-case tracking-normal">{formatBytes(document.size_bytes)}</span>
-          </p>
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            <span
-              className={cn(
-                'inline-flex rounded-lg px-2 py-1 text-[0.7rem] font-semibold uppercase',
-                meta.badgeClass,
+          <div className="min-w-0 flex-1">
+            <p className="m-0 flex flex-wrap items-center gap-1.5 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-muted">
+              <span>Document</span>
+              <span className="text-placeholder">•</span>
+              <span className="normal-case tracking-normal">{formatBytes(document.size_bytes)}</span>
+            </p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              <span
+                className={cn(
+                  'inline-flex rounded-lg px-2 py-1 text-[0.7rem] font-semibold uppercase',
+                  meta.badgeClass,
+                )}
+              >
+                {meta.label}
+              </span>
+              {canViewFindings && !compliancePending ? (
+                <button
+                  type="button"
+                  onClick={() => setFindingsOpen(true)}
+                  className={cn(
+                    'inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-[0.7rem] font-semibold transition hover:brightness-95',
+                    compliance.className,
+                  )}
+                  title="View compliance findings"
+                >
+                  <FiShield size={11} aria-hidden />
+                  {compliance.label}
+                </button>
+              ) : (
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[0.7rem] font-semibold',
+                    compliance.className,
+                  )}
+                  title={document.compliance_summary || undefined}
+                >
+                  <FiShield size={11} aria-hidden />
+                  {compliancePending ? 'Checking…' : compliance.label}
+                </span>
               )}
-            >
-              {meta.label}
-            </span>
-            <span
-              className={cn(
-                'inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[0.7rem] font-semibold',
-                compliance.className,
-              )}
-              title={document.compliance_summary || undefined}
-            >
-              <FiShield size={11} aria-hidden />
-              {compliancePending ? 'Checking…' : compliance.label}
-            </span>
+            </div>
           </div>
+
+          <ContextMenu
+            align="end"
+            trigger={({ open, props }) => (
+              <button
+                {...props}
+                aria-label={`Document actions for ${document.original_name}`}
+                className={cn(
+                  'grid size-8 shrink-0 cursor-pointer place-items-center rounded-full bg-bg-elevated text-muted transition hover:bg-surface-2 hover:text-ink',
+                  open && 'bg-surface-2 text-ink',
+                )}
+              >
+                <MoreIcon />
+              </button>
+            )}
+            items={menuItems}
+          />
         </div>
 
-        <ContextMenu
-          align="end"
-          trigger={({ open, props }) => (
-            <button
-              {...props}
-              aria-label={`Document actions for ${document.original_name}`}
-              className={cn(
-                'grid size-8 shrink-0 cursor-pointer place-items-center rounded-full bg-bg-elevated text-muted transition hover:bg-surface-2 hover:text-ink',
-                open && 'bg-surface-2 text-ink',
-              )}
-            >
-              <MoreIcon />
-            </button>
-          )}
-          items={menuItems}
-        />
-      </div>
-
-      <div className="mt-5 min-w-0 flex-1 overflow-hidden">
-        <button
-          type="button"
-          onClick={() => onPreview(document)}
-          className="m-0 block w-full max-w-full cursor-pointer overflow-hidden text-left font-display text-base font-bold leading-snug tracking-tight text-ink transition [overflow-wrap:anywhere] [word-break:break-word] hover:text-accent line-clamp-3"
-          title={`Preview ${document.original_name}`}
-        >
-          {title}
-        </button>
-        <p className="mt-2 m-0 flex items-center gap-1.5 text-sm text-muted">
-          <FiClock size={14} className="shrink-0 text-accent/70" aria-hidden />
-          Uploaded {uploadedLabel}
-        </p>
-        {document.compliance_summary ? (
-          <p className="mt-2 line-clamp-2 text-xs text-muted" title={document.compliance_summary}>
-            {document.compliance_summary}
+        <div className="mt-5 min-w-0 flex-1 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => onPreview(document)}
+            className="m-0 block w-full max-w-full cursor-pointer overflow-hidden text-left font-display text-base font-bold leading-snug tracking-tight text-ink transition [overflow-wrap:anywhere] [word-break:break-word] hover:text-accent line-clamp-3"
+            title={`Preview ${document.original_name}`}
+          >
+            {title}
+          </button>
+          <p className="mt-2 m-0 flex items-center gap-1.5 text-sm text-muted">
+            <FiClock size={14} className="shrink-0 text-accent/70" aria-hidden />
+            Uploaded {uploadedLabel}
           </p>
-        ) : null}
-      </div>
-
-      <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-4">
-        <div className="flex items-center">
-          {preview.map((person, index) => (
-            <Avatar
-              key={person.id}
-              name={person.full_name}
-              email={person.email}
-              imageUrl={person.avatar_url}
-              title={person.full_name || person.email}
-              className={cn('ring-2 ring-surface', index === 0 ? undefined : 'ml-[-8px]')}
-            />
-          ))}
-          {extra > 0 ? (
-            <span className="ml-[-8px] grid size-9 place-items-center rounded-full bg-bg-elevated text-[0.7rem] font-bold text-muted ring-2 ring-surface">
-              +{extra}
-            </span>
+          {document.compliance_summary ? (
+            canViewFindings ? (
+              <ComplianceSummaryButton
+                summary={document.compliance_summary}
+                onClick={() => setFindingsOpen(true)}
+              />
+            ) : (
+              <p className="mt-2 line-clamp-2 text-xs text-muted" title={document.compliance_summary}>
+                {document.compliance_summary}
+              </p>
+            )
           ) : null}
-          {canManage ? (
+        </div>
+
+        <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-4">
+          <div className="flex items-center">
+            {preview.map((person, index) => (
+              <Avatar
+                key={person.id}
+                name={person.full_name}
+                email={person.email}
+                imageUrl={person.avatar_url}
+                title={person.full_name || person.email}
+                className={cn('ring-2 ring-surface', index === 0 ? undefined : 'ml-[-8px]')}
+              />
+            ))}
+            {extra > 0 ? (
+              <span className="ml-[-8px] grid size-9 place-items-center rounded-full bg-bg-elevated text-[0.7rem] font-bold text-muted ring-2 ring-surface">
+                +{extra}
+              </span>
+            ) : null}
+            {canManage ? (
+              <button
+                type="button"
+                title="Add members"
+                aria-label={`Add members to ${document.original_name}`}
+                onClick={() => onAddMembers(document)}
+                className="ml-[-8px] grid size-9 cursor-pointer place-items-center rounded-full border-2 border-dashed border-line bg-surface text-muted transition hover:z-10 hover:border-accent hover:text-accent active:scale-95"
+              >
+                <PlusIcon />
+              </button>
+            ) : null}
+          </div>
+
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
-              title="Add members"
-              aria-label={`Add members to ${document.original_name}`}
-              onClick={() => onAddMembers(document)}
-              className="ml-[-8px] grid size-9 cursor-pointer place-items-center rounded-full border-2 border-dashed border-line bg-surface text-muted transition hover:z-10 hover:border-accent hover:text-accent active:scale-95"
+              title="Preview"
+              aria-label={`Preview ${document.original_name}`}
+              onClick={() => onPreview(document)}
+              className="grid size-9 cursor-pointer place-items-center rounded-full bg-accent-soft text-accent transition hover:bg-accent hover:text-ink-on-accent active:scale-95"
             >
-              <PlusIcon />
+              <FiEye size={15} aria-hidden />
             </button>
-          ) : null}
+            <button
+              type="button"
+              title="Download"
+              aria-label={`Download ${document.original_name}`}
+              onClick={() => onDownload(document)}
+              className="grid size-9 cursor-pointer place-items-center rounded-full bg-bg-elevated text-muted transition hover:bg-surface-2 hover:text-ink active:scale-95"
+            >
+              <FiDownload size={15} aria-hidden />
+            </button>
+          </div>
         </div>
+      </article>
 
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            title="Preview"
-            aria-label={`Preview ${document.original_name}`}
-            onClick={() => onPreview(document)}
-            className="grid size-9 cursor-pointer place-items-center rounded-full bg-accent-soft text-accent transition hover:bg-accent hover:text-ink-on-accent active:scale-95"
-          >
-            <FiEye size={15} aria-hidden />
-          </button>
-          <button
-            type="button"
-            title="Download"
-            aria-label={`Download ${document.original_name}`}
-            onClick={() => onDownload(document)}
-            className="grid size-9 cursor-pointer place-items-center rounded-full bg-bg-elevated text-muted transition hover:bg-surface-2 hover:text-ink active:scale-95"
-          >
-            <FiDownload size={15} aria-hidden />
-          </button>
-        </div>
-      </div>
-    </article>
+      <ComplianceFindingsDialog
+        open={findingsOpen}
+        document={document}
+        onClose={() => setFindingsOpen(false)}
+      />
+    </>
   )
 }

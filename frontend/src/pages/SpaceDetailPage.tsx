@@ -18,6 +18,7 @@ import {
   Alert,
   Breadcrumbs,
   Button,
+  ConfirmDialog,
   DeadlinePicker,
   Drawer,
   Input,
@@ -140,6 +141,7 @@ export function SpaceDetailPage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [previewDocument, setPreviewDocument] = useState<SpaceDocument | null>(null)
+  const [compliancePromptDoc, setCompliancePromptDoc] = useState<SpaceDocument | null>(null)
   const [membersOpen, setMembersOpen] = useState(false)
   const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null)
   const [addSpaceMembersOpen, setAddSpaceMembersOpen] = useState(false)
@@ -341,12 +343,7 @@ export function SpaceDetailPage() {
       setUploadFile(null)
       setUploadProgress(0)
       toast.success('Document uploaded', created.original_name)
-      const runCheck = window.confirm(
-        `Do you want to check compliance for “${created.original_name}”?`,
-      )
-      if (runCheck) {
-        await handleDocumentComplianceCheck(created)
-      }
+      setCompliancePromptDoc(created)
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to upload document')
       toast.error('Upload failed', err instanceof Error ? err.message : undefined)
@@ -418,6 +415,13 @@ export function SpaceDetailPage() {
         err instanceof Error ? err.message : undefined,
       )
     }
+  }
+
+  async function handleConfirmComplianceCheck() {
+    if (!compliancePromptDoc) return
+    const doc = compliancePromptDoc
+    setCompliancePromptDoc(null)
+    await handleDocumentComplianceCheck(doc)
   }
 
   async function handleDownload(document: SpaceDocument) {
@@ -691,6 +695,27 @@ export function SpaceDetailPage() {
         }
         onClose={() => setPreviewDocument(null)}
         onDownload={(document) => void handleDownload(document)}
+      />
+
+      <ConfirmDialog
+        open={Boolean(compliancePromptDoc)}
+        title="Check compliance?"
+        description={
+          compliancePromptDoc ? (
+            <p>
+              Do you want to run a compliance check on{' '}
+              <span className="font-semibold text-ink">
+                “{compliancePromptDoc.original_name}”
+              </span>
+              ?
+            </p>
+          ) : null
+        }
+        confirmLabel="Yes, check"
+        cancelLabel="No"
+        confirming={runDocumentCompliance.isPending}
+        onConfirm={() => void handleConfirmComplianceCheck()}
+        onCancel={() => setCompliancePromptDoc(null)}
       />
 
       <Drawer

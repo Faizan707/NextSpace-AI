@@ -20,3 +20,12 @@ export function useWorkTasksQuery() {
     queryFn: () => workApi.listWorkTasks(requireToken(token)),
   })
 }
+
+export function useWorkDashboardQuery() {
+  const token = useAuthToken()
+  return useQuery({
+    queryKey: queryKeys.work.dashboard,
+    enabled: Boolean(token),
+    queryFn: () => workApi.getWorkDashboard(requireToken(token)),
+  })
+}

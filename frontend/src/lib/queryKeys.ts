@@ -25,6 +25,7 @@ export const queryKeys = {
   work: {
     projects: ['work', 'projects'] as const,
     tasks: ['work', 'tasks'] as const,
+    dashboard: ['work', 'dashboard'] as const,
   },
   admin: {
     overview: ['admin', 'overview'] as const,

@@ -16,7 +16,11 @@ export {
   useCompanyMembersQuery,
   useUpdateCompanyMutation,
 } from './useCompany'
-export { useWorkProjectsQuery, useWorkTasksQuery } from './useWork'
+export {
+  useWorkProjectsQuery,
+  useWorkTasksQuery,
+  useWorkDashboardQuery,
+} from './useWork'
 export {
   useProjectQuery,
   useProjectBoardQuery,

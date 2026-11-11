@@ -252,6 +252,53 @@ export interface WorkTask {
   updated_at: string
 }
 
+export interface DashboardKpis {
+  spaces: number
+  projects: number
+  teams: number
+  members: number
+  tasks_total: number
+  tasks_done: number
+  tasks_open: number
+  avg_project_progress: number
+}
+
+export interface DashboardNamedCount {
+  name: string
+  value: number
+}
+
+export interface DashboardProjectProgress {
+  name: string
+  space_name: string
+  progress: number
+}
+
+export interface DashboardTeamPerformance {
+  name: string
+  space_name: string
+  members: number
+  assigned_tasks: number
+  done_tasks: number
+}
+
+export interface DashboardMemberPerformance {
+  name: string
+  assigned: number
+  done: number
+  open: number
+}
+
+export interface WorkDashboard {
+  kpis: DashboardKpis
+  tasks_by_priority: DashboardNamedCount[]
+  tasks_by_status: DashboardNamedCount[]
+  tasks_by_space: DashboardNamedCount[]
+  project_progress: DashboardProjectProgress[]
+  team_performance: DashboardTeamPerformance[]
+  member_performance: DashboardMemberPerformance[]
+}
+
 export type NotificationType =
   | 'task_assigned'
   | 'space_added'
