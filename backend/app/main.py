@@ -321,5 +321,7 @@ app.include_router(space_documents.router)
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def health() -> dict[str, str | bool]:
+    from app.services.email import is_email_configured
+
+    return {"status": "ok", "smtp_configured": is_email_configured()}

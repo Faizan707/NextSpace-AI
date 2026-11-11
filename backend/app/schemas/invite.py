@@ -40,3 +40,5 @@ class InviteCreateResult(BaseModel):
     invite: InviteRead
     temporary_password: str | None = None
     invite_link: str | None = None
+    email_sent: bool = False
+    email_error: str | None = None

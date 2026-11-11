@@ -105,6 +105,8 @@ export interface InviteCreateResult {
   invite: InviteRecord
   temporary_password: string | null
   invite_link: string | null
+  email_sent: boolean
+  email_error: string | null
 }
 
 export interface InvitePublic {

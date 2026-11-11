@@ -94,12 +94,21 @@ export function AdminUsersPage() {
     setLastInvite(null)
     try {
       const result = await createInvite.mutateAsync(payload)
-      setLastInvite(result)
-      setSuccess(
-        payload.send_password
-          ? 'User created. Login credentials were emailed (preview below).'
-          : 'Invite sent. They can sign up via the invite link.',
-      )
+      // Only keep manual-share secrets on screen when email delivery failed.
+      setLastInvite(result.email_sent ? null : result)
+      if (result.email_sent) {
+        setSuccess(
+          payload.send_password
+            ? 'User created and invite email sent with login credentials.'
+            : 'Invite email sent. They can join from their inbox.',
+        )
+      } else {
+        setSuccess(
+          payload.send_password
+            ? `User created. Email was not sent${result.email_error ? ` (${result.email_error})` : ''} — credentials are shown below.`
+            : `Invite created. Email was not sent${result.email_error ? ` (${result.email_error})` : ''} — copy the invite link below.`,
+        )
+      }
       setDrawerOpen(false)
     } catch (err) {
       setDrawerError(err instanceof Error ? err.message : 'Invite failed')
@@ -265,15 +274,15 @@ export function AdminUsersPage() {
         </div>
       ) : null}
 
-      {lastInvite?.temporary_password ? (
+      {!lastInvite?.email_sent && lastInvite?.temporary_password ? (
         <div className="rounded-2xl border border-line bg-surface p-4 text-sm text-ink shadow-sm">
-          <p className="font-semibold">Temporary password (dev preview)</p>
+          <p className="font-semibold">Temporary password (copy & share manually)</p>
           <p className="mt-1 font-mono">{lastInvite.temporary_password}</p>
         </div>
       ) : null}
-      {lastInvite?.invite_link ? (
+      {!lastInvite?.email_sent && lastInvite?.invite_link ? (
         <div className="rounded-2xl border border-line bg-surface p-4 text-sm text-ink shadow-sm">
-          <p className="font-semibold">Invite link (dev preview)</p>
+          <p className="font-semibold">Invite link (copy & share manually)</p>
           <p className="mt-1 break-all font-mono text-accent">{lastInvite.invite_link}</p>
         </div>
       ) : null}
@@ -301,7 +310,7 @@ export function AdminUsersPage() {
                     <p className="truncate text-sm font-semibold text-ink">{invite.email}</p>
                     <p className="mt-0.5 text-xs text-muted">
                       {invite.job_role ? `${invite.job_role} · ` : ''}
-                      {invite.send_password ? 'Password emailed' : 'Invite link only'}
+                      Awaiting acceptance
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">

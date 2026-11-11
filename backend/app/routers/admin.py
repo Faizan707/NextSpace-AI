@@ -16,7 +16,7 @@ from app.models.user import User, UserRole
 from app.schemas.admin import AdminOverview, MemberRead, MemberUpdate
 from app.schemas.invite import InviteCreate, InviteCreateResult, InviteRead
 from app.schemas.space import SpaceRead
-from app.services.email import send_email
+from app.services.email import invite_email_html, send_email
 from app.services.space_access import to_space_reads
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -135,6 +135,8 @@ def create_invite(
     temporary_password: str | None = None
     invite_link: str | None = None
     company_name = current_user.company.name if current_user.company else "your company"
+    email_sent = False
+    email_error: str | None = None
 
     if payload.send_password:
         temporary_password = _generate_password()
@@ -152,31 +154,58 @@ def create_invite(
 
         invite.accepted_at = datetime.now(UTC)
         login_url = f"{settings.frontend_url.rstrip('/')}/login"
-        send_email(
+        body = (
+            f"Hi{f' {full_name}' if full_name else ''},\n\n"
+            f"You have been added to {company_name} on {settings.app_name}.\n\n"
+            f"Email: {email}\n"
+            f"{f'Role: {job_role}\n' if job_role else ''}"
+            f"Temporary password: {temporary_password}\n\n"
+            f"Sign in here: {login_url}\n"
+            "Please change your password after logging in.\n"
+        )
+        mail = send_email(
             to=email,
             subject=f"You're invited to {company_name} on {settings.app_name}",
-            body=(
-                f"Hi{f' {full_name}' if full_name else ''},\n\n"
-                f"You have been added to {company_name} on {settings.app_name}.\n\n"
-                f"Email: {email}\n"
-                f"{f'Role: {job_role}\n' if job_role else ''}"
-                f"Temporary password: {temporary_password}\n\n"
-                f"Sign in here: {login_url}\n"
-                "Please change your password after logging in.\n"
+            body=body,
+            html=invite_email_html(
+                app_name=settings.app_name,
+                company_name=company_name,
+                greeting_name=full_name,
+                role_line=job_role,
+                cta_label="Sign in",
+                cta_url=login_url,
+                extra_lines=[
+                    f"Email: {email}",
+                    f"Temporary password: {temporary_password}",
+                    "Please change your password after logging in.",
+                ],
             ),
         )
+        email_sent = mail.delivered
+        email_error = mail.error
     else:
         invite_link = f"{settings.frontend_url.rstrip('/')}/invite/{token}"
-        send_email(
+        body = (
+            f"Hi{f' {full_name}' if full_name else ''},\n\n"
+            f"You have been invited to join {company_name} on {settings.app_name}.\n\n"
+            f"{f'Role: {job_role}\n\n' if job_role else ''}"
+            f"Accept your invite and set a password here:\n{invite_link}\n"
+        )
+        mail = send_email(
             to=email,
             subject=f"Invitation to join {company_name} on {settings.app_name}",
-            body=(
-                f"Hi{f' {full_name}' if full_name else ''},\n\n"
-                f"You have been invited to join {company_name} on {settings.app_name}.\n\n"
-                f"{f'Role: {job_role}\n\n' if job_role else ''}"
-                f"Accept your invite and set a password here:\n{invite_link}\n"
+            body=body,
+            html=invite_email_html(
+                app_name=settings.app_name,
+                company_name=company_name,
+                greeting_name=full_name,
+                role_line=job_role,
+                cta_label="Accept invite",
+                cta_url=invite_link,
             ),
         )
+        email_sent = mail.delivered
+        email_error = mail.error
 
     db.commit()
     db.refresh(invite)
@@ -184,6 +213,8 @@ def create_invite(
         invite=InviteRead.model_validate(invite),
         temporary_password=temporary_password,
         invite_link=invite_link,
+        email_sent=email_sent,
+        email_error=email_error,
     )
 
 
