@@ -10,7 +10,7 @@ _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 
 def normalize_database_url(url: str) -> str:
     """Use psycopg v3 driver. Railway often injects postgresql:// without +psycopg."""
-    value = (url or "").strip()
+    value = (url or "").strip().strip('"').strip("'")
     if value.startswith("postgres://"):
         value = "postgresql://" + value[len("postgres://") :]
     if value.startswith("postgresql://"):
