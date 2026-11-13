@@ -1,0 +1,15 @@
+**/.venv
+**/__pycache__
+**/*.py[cod]
+**/.env
+**/.env.*
+!**/.env.example
+backend/uploads
+backend/*.db
+frontend
+frontend/node_modules
+.cursor
+.git
+**/.pytest_cache
+**/.mypy_cache
+scripts
