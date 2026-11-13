@@ -45,6 +45,8 @@ export function ConfirmDialog({
     return () => node.removeEventListener('close', onClose)
   }, [open, onCancel])
 
+  if (!open) return null
+
   return (
     <dialog
       ref={ref}

@@ -73,7 +73,8 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'nextspace-auth',
-      partialize: (state) => ({ token: state.token }),
+      // Persist identity with the token so hard refresh does not flash "User" / "there".
+      partialize: (state) => ({ token: state.token, user: state.user }),
     },
   ),
 )

@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     smtp_password: str | None = None
     smtp_from: str | None = None
     smtp_use_tls: bool = True
+    # Prefer true + port 465 on Railway if STARTTLS (587) times out.
+    smtp_use_ssl: bool = False
+    # Brevo HTTPS API key (xkeysib-…). Preferred on Railway where SMTP ports time out.
+    brevo_api_key: str | None = None
+    # Force Brevo HTTPS before SMTP (recommended on Railway).
+    smtp_prefer_api: bool = True
 
     # AWS S3 (documents + task attachments). Leave unset to keep local uploads/.
     aws_access_key_id: str | None = None
@@ -57,6 +63,7 @@ class Settings(BaseSettings):
         "smtp_username",
         "smtp_password",
         "smtp_from",
+        "brevo_api_key",
         "aws_access_key_id",
         "aws_secret_access_key",
         "aws_s3_bucket",

@@ -49,11 +49,7 @@ function SoftCard({
           >
             <FiArrowUpRight size={15} />
           </Link>
-        ) : (
-          <span className="grid size-7 shrink-0 place-items-center rounded-full text-muted/40">
-            <FiArrowUpRight size={15} />
-          </span>
-        )}
+        ) : null}
       </div>
       <div className="min-h-0 flex-1">{children}</div>
     </section>
@@ -227,6 +223,12 @@ export function DashboardHomePage() {
     [data?.member_performance],
   )
 
+  const assignedOpen = useMemo(
+    () => memberRows.reduce((sum, item) => sum + item.open, 0),
+    [memberRows],
+  )
+  const unassignedOpen = Math.max((data?.kpis?.tasks_open ?? 0) - assignedOpen, 0)
+
   const priorityRows = data?.tasks_by_priority ?? []
   const projectRows = data?.project_progress ?? []
 
@@ -286,7 +288,7 @@ export function DashboardHomePage() {
           <div className="space-y-3">
             <ThickTrack label="Completed" value={statusMap.Done} max={barMax} color={TEAL} />
             <ThickTrack
-              label="Work in progress"
+              label="In progress"
               value={statusMap['In Progress']}
               max={barMax}
               color={INDIGO}
@@ -388,8 +390,21 @@ export function DashboardHomePage() {
         </SoftCard>
 
         <SoftCard title="Open work" href="/app/tasks">
-          {memberRows.length > 0 ? (
+          {memberRows.length > 0 || unassignedOpen > 0 ? (
             <div className="space-y-2">
+              {unassignedOpen > 0 ? (
+                <div className="flex items-center justify-between gap-3 rounded-2xl bg-[#f7f9fc] px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink">Unassigned</p>
+                    <p className="text-xs tabular-nums text-muted">
+                      {unassignedOpen} open · needs an owner
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-white px-2.5 py-1 font-display text-xs font-bold tabular-nums text-ink shadow-sm">
+                    {unassignedOpen}
+                  </span>
+                </div>
+              ) : null}
               {memberRows.map((item) => (
                 <div
                   key={item.name}
