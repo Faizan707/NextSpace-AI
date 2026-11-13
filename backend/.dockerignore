@@ -1,0 +1,16 @@
+.venv
+__pycache__
+*.py[cod]
+.env
+.env.*
+!.env.example
+uploads
+*.db
+.pytest_cache
+.mypy_cache
+.ruff_cache
+scripts
+aws
+.git
+.gitignore
+README.md

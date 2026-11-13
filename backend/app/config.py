@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
     frontend_url: str = "http://127.0.0.1:5174"
+    # Comma-separated browser origins allowed by CORS (local Vite + later Vercel).
+    cors_origins: str = (
+        "http://localhost:5173,http://127.0.0.1:5173,"
+        "http://localhost:5174,http://127.0.0.1:5174,"
+        "http://localhost:4173,http://127.0.0.1:4173"
+    )
 
     # Invite / transactional email (SMTP). Leave unset to keep console outbox in dev.
     smtp_host: str | None = None
@@ -50,6 +56,18 @@ class Settings(BaseSettings):
         if isinstance(value, str) and not value.strip():
             return None
         return value
+
+
+    def cors_origin_list(self) -> list[str]:
+        origins: set[str] = set()
+        for part in self.cors_origins.split(","):
+            origin = part.strip().rstrip("/")
+            if origin:
+                origins.add(origin)
+        frontend = (self.frontend_url or "").strip().rstrip("/")
+        if frontend:
+            origins.add(frontend)
+        return sorted(origins)
 
 
 @lru_cache
