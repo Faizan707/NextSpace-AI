@@ -4,7 +4,7 @@ import secrets
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -16,8 +16,8 @@ from app.routers.space_projects import _get_project_in_space
 from app.schemas.space import SpaceCreatorRead
 from app.schemas.task_activity import TaskAttachmentRead, TaskDetailRead
 from app.services.space_access import get_accessible_space
+from app.services.storage import delete_stored, download_response, save_bytes
 from app.services.task_scope import can_manage, require_task
-from app.services.uploads import UPLOADS_ROOT, task_upload_dir
 
 router = APIRouter(prefix="/spaces", tags=["task-activity"])
 
@@ -165,13 +165,13 @@ async def upload_attachment(
 
     suffix = Path(original_name).suffix[:40]
     stored_name = f"{secrets.token_urlsafe(16)}{suffix}"
-    dest_path = task_upload_dir(task_id) / stored_name
-    dest_path.write_bytes(data)
+    stored_path = f"tasks/{task_id}/{stored_name}"
+    save_bytes(relative_path=stored_path, data=data, content_type=file.content_type)
 
     attachment = TaskAttachment(
         task_id=task_id,
         original_name=original_name,
-        stored_path=f"tasks/{task_id}/{stored_name}",
+        stored_path=stored_path,
         content_type=file.content_type,
         size_bytes=len(data),
         uploaded_by_id=current_user.id,
@@ -192,7 +192,7 @@ def download_attachment(
     attachment_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> FileResponse:
+) -> Response:
     get_accessible_space(db, space_id, current_user)
     _get_project_in_space(db, space_id, project_id)
     attachment = db.scalar(
@@ -203,14 +203,10 @@ def download_attachment(
     if attachment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found")
 
-    file_path = UPLOADS_ROOT / attachment.stored_path
-    if not file_path.exists():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File missing on disk")
-
-    return FileResponse(
-        path=file_path,
+    return download_response(
+        relative_path=attachment.stored_path,
         filename=attachment.original_name,
-        media_type=attachment.content_type or "application/octet-stream",
+        content_type=attachment.content_type,
     )
 
 
@@ -237,8 +233,7 @@ def delete_attachment(
     if not can_manage(current_user, attachment.uploaded_by_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
 
-    file_path = UPLOADS_ROOT / attachment.stored_path
+    stored_path = attachment.stored_path
     db.delete(attachment)
     db.commit()
-    if file_path.exists():
-        file_path.unlink(missing_ok=True)
+    delete_stored(stored_path)

@@ -2,7 +2,7 @@ import secrets
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -24,7 +24,7 @@ from app.services.space_access import (
     get_accessible_space,
     require_document_access,
 )
-from app.services.uploads import UPLOADS_ROOT, space_upload_dir
+from app.services.storage import delete_stored, download_response, open_stored_path, save_bytes
 
 router = APIRouter(prefix="/spaces", tags=["space-documents"])
 
@@ -117,13 +117,13 @@ async def upload_document(
 
     suffix = Path(original_name).suffix[:40]
     stored_name = f"{secrets.token_urlsafe(16)}{suffix}"
-    dest_path = space_upload_dir(space_id) / stored_name
-    dest_path.write_bytes(data)
+    stored_path = f"spaces/{space_id}/{stored_name}"
+    save_bytes(relative_path=stored_path, data=data, content_type=file.content_type)
 
     document = Document(
         space_id=space_id,
         original_name=original_name,
-        stored_path=f"spaces/{space_id}/{stored_name}",
+        stored_path=stored_path,
         content_type=file.content_type,
         size_bytes=len(data),
         uploaded_by_id=current_user.id,
@@ -234,8 +234,8 @@ def run_document_compliance_check(
     document = _get_document_in_space(db, space_id, document_id)
     require_document_access(current_user, space, document)
 
-    file_path = UPLOADS_ROOT / document.stored_path
-    result = run_compliance_check(document, file_path)
+    with open_stored_path(document.stored_path) as file_path:
+        result = run_compliance_check(document, file_path)
     apply_compliance_result(document, result)
     db.commit()
 
@@ -249,19 +249,15 @@ def download_document(
     document_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> FileResponse:
+) -> Response:
     space = get_accessible_space(db, space_id, current_user)
     document = _get_document_in_space(db, space_id, document_id)
     require_document_access(current_user, space, document)
 
-    file_path = UPLOADS_ROOT / document.stored_path
-    if not file_path.exists():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File missing on disk")
-
-    return FileResponse(
-        path=file_path,
+    return download_response(
+        relative_path=document.stored_path,
         filename=document.original_name,
-        media_type=document.content_type or "application/octet-stream",
+        content_type=document.content_type,
     )
 
 
@@ -281,8 +277,7 @@ def delete_document(
             detail="Not allowed to delete this document",
         )
 
-    file_path = UPLOADS_ROOT / document.stored_path
+    stored_path = document.stored_path
     db.delete(document)
     db.commit()
-    if file_path.exists():
-        file_path.unlink(missing_ok=True)
+    delete_stored(stored_path)

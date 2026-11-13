@@ -29,11 +29,20 @@ class Settings(BaseSettings):
     smtp_from: str | None = None
     smtp_use_tls: bool = True
 
+    # AWS S3 (documents + task attachments). Leave unset to keep local uploads/.
+    aws_access_key_id: str | None = None
+    aws_secret_access_key: str | None = None
+    aws_region: str = "ap-southeast-2"
+    aws_s3_bucket: str | None = None
+
     @field_validator(
         "smtp_host",
         "smtp_username",
         "smtp_password",
         "smtp_from",
+        "aws_access_key_id",
+        "aws_secret_access_key",
+        "aws_s3_bucket",
         mode="before",
     )
     @classmethod
