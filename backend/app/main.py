@@ -279,19 +279,12 @@ async def lifespan(_: FastAPI):
     hub.bind_loop(asyncio.get_running_loop())
     raw_db = (os.getenv("DATABASE_URL") or "").strip().strip('"').strip("'")
     db_host = settings.database_host()
-    print(
-        "Starting NextSpace API — "
-        f"DATABASE_URL env={'set' if raw_db else 'MISSING'}, "
-        f"resolved host={db_host}"
-    )
-    if os.getenv("RAILWAY_ENVIRONMENT") and (
-        not raw_db or db_host in {"localhost", "127.0.0.1", "::1"}
-    ):
-        raise RuntimeError(
-            "DATABASE_URL is missing or points to localhost inside the container. "
-            "In Railway → your API service → Variables: click Update Variables, then Redeploy. "
-            "Confirm DATABASE_URL contains neon.tech and is attached to THIS service "
-            "(not only Shared/Project). Remove Railway Postgres if it overwrites the var."
+    # Keep this ONE short line — easy to spot/copy in Railway logs.
+    print(f"DIAG db_env={'yes' if raw_db else 'NO'} host={db_host} keys={[k for k in os.environ if 'DATABASE' in k or k.endswith('_URL')]}")
+    if not raw_db or db_host in {"localhost", "127.0.0.1", "::1"}:
+        print(
+            "DIAG WARN: DATABASE_URL missing in container. "
+            "Railway → this service → Variables → enable/share DATABASE_URL → Redeploy."
         )
     Base.metadata.create_all(bind=engine)
     _ensure_project_columns()
