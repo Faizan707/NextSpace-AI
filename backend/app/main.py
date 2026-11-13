@@ -274,7 +274,17 @@ def _backfill_project_stages() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    import os
+
     hub.bind_loop(asyncio.get_running_loop())
+    db_host = settings.database_host()
+    print(f"Starting NextSpace API — database host: {db_host}")
+    if os.getenv("RAILWAY_ENVIRONMENT") and db_host in {"localhost", "127.0.0.1", "::1"}:
+        raise RuntimeError(
+            "DATABASE_URL points to localhost. On Railway set DATABASE_URL to your Neon "
+            "connection string (postgresql+psycopg://...@....neon.tech/...). "
+            "Do not use Railway Postgres unless you intentionally switch databases."
+        )
     Base.metadata.create_all(bind=engine)
     _ensure_project_columns()
     _ensure_user_job_role_columns()
@@ -322,4 +332,5 @@ def health() -> dict[str, str | bool]:
         "status": "ok",
         "smtp_configured": is_email_configured(),
         "s3_configured": is_s3_configured(),
+        "database_host": settings.database_host(),
     }

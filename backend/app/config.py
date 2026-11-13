@@ -1,10 +1,21 @@
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlparse
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+
+
+def normalize_database_url(url: str) -> str:
+    """Use psycopg v3 driver. Railway often injects postgresql:// without +psycopg."""
+    value = (url or "").strip()
+    if value.startswith("postgres://"):
+        value = "postgresql://" + value[len("postgres://") :]
+    if value.startswith("postgresql://"):
+        value = "postgresql+psycopg://" + value[len("postgresql://") :]
+    return value
 
 
 class Settings(BaseSettings):
@@ -57,6 +68,12 @@ class Settings(BaseSettings):
             return None
         return value
 
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_db_url(cls, value: object) -> object:
+        if not isinstance(value, str) or not value.strip():
+            return value
+        return normalize_database_url(value)
 
     def cors_origin_list(self) -> list[str]:
         origins: set[str] = set()
@@ -68,6 +85,12 @@ class Settings(BaseSettings):
         if frontend:
             origins.add(frontend)
         return sorted(origins)
+
+    def database_host(self) -> str:
+        try:
+            return urlparse(self.database_url).hostname or "unknown"
+        except Exception:
+            return "unknown"
 
 
 @lru_cache
