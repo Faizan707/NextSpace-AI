@@ -277,13 +277,21 @@ async def lifespan(_: FastAPI):
     import os
 
     hub.bind_loop(asyncio.get_running_loop())
+    raw_db = os.getenv("DATABASE_URL")
     db_host = settings.database_host()
-    print(f"Starting NextSpace API — database host: {db_host}")
-    if os.getenv("RAILWAY_ENVIRONMENT") and db_host in {"localhost", "127.0.0.1", "::1"}:
+    print(
+        "Starting NextSpace API — "
+        f"DATABASE_URL env={'set' if raw_db else 'MISSING'}, "
+        f"resolved host={db_host}"
+    )
+    if os.getenv("RAILWAY_ENVIRONMENT") and (
+        not raw_db or db_host in {"localhost", "127.0.0.1", "::1"}
+    ):
         raise RuntimeError(
-            "DATABASE_URL points to localhost. On Railway set DATABASE_URL to your Neon "
-            "connection string (postgresql+psycopg://...@....neon.tech/...). "
-            "Do not use Railway Postgres unless you intentionally switch databases."
+            "DATABASE_URL is missing or points to localhost inside the container. "
+            "In Railway → your API service → Variables, set DATABASE_URL to the Neon URL "
+            "(must contain neon.tech). Save, then Redeploy. "
+            "Remove any Railway Postgres plugin so it cannot overwrite this variable."
         )
     Base.metadata.create_all(bind=engine)
     _ensure_project_columns()
