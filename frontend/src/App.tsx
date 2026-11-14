@@ -6,6 +6,7 @@ import { Toaster } from './components/ui'
 import { AcceptInvitePage } from './pages/AcceptInvitePage'
 import { AdminSpacesPage } from './pages/admin/AdminSpacesPage'
 import { AdminUsersPage } from './pages/admin/AdminUsersPage'
+import { AiAssistantPage } from './pages/AiAssistantPage'
 import { CompanyPage } from './pages/CompanyPage'
 import { DashboardHomePage } from './pages/DashboardHomePage'
 import { InboxPage } from './pages/InboxPage'
@@ -36,6 +37,7 @@ export default function App() {
             <Route path="projects" element={<ProjectsPage />} />
             <Route path="tasks" element={<TasksPage />} />
             <Route path="inbox" element={<InboxPage />} />
+            <Route path="ai" element={<AiAssistantPage />} />
             <Route path="company" element={<CompanyPage />} />
           </Route>
           <Route path="/app/admin" element={<AdminShell />}>

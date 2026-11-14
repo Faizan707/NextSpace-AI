@@ -32,6 +32,7 @@ from app.models import (  # noqa: F401
 )
 from app.routers import (
     admin,
+    ai_assistant,
     auth,
     chat,
     companies,
@@ -322,6 +323,7 @@ app.include_router(ws.router)
 app.include_router(work.router)
 app.include_router(space_teams.router)
 app.include_router(space_documents.router)
+app.include_router(ai_assistant.router)
 
 
 @app.get("/health")

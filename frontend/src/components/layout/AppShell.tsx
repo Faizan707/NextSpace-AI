@@ -12,6 +12,7 @@ const navItems = [
   { to: '/app/projects', label: 'Projects', end: false, icon: '▣' },
   { to: '/app/tasks', label: 'Tasks', end: false, icon: '✓' },
   { to: '/app/inbox', label: 'Inbox', end: false, icon: '✉' },
+  { to: '/app/ai', label: 'AI', end: false, icon: '✦' },
 ]
 
 export function AppShell() {

@@ -1,4 +1,4 @@
-from functools import lru_cache
+﻿from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = True
     # Prefer true + port 465 on Railway if STARTTLS (587) times out.
     smtp_use_ssl: bool = False
-    # Brevo HTTPS API key (xkeysib-…). Preferred on Railway where SMTP ports time out.
+    # Brevo HTTPS API key (xkeysib-â€¦). Preferred on Railway where SMTP ports time out.
     brevo_api_key: str | None = None
     # Force Brevo HTTPS before SMTP (recommended on Railway).
     smtp_prefer_api: bool = True
@@ -58,6 +58,19 @@ class Settings(BaseSettings):
     aws_region: str = "ap-southeast-2"
     aws_s3_bucket: str | None = None
 
+    # AI: LLM provider + Qdrant. Default local Ollama; switch to openai later.
+    ai_llm_provider: str = "ollama"
+    ollama_base_url: str = "http://127.0.0.1:11434"
+    ollama_chat_model: str = "qwen3:4b"
+    ollama_embed_model: str = "nomic-embed-text"
+    openai_api_key: str | None = None
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_chat_model: str = "gpt-4o-mini"
+    openai_embed_model: str = "text-embedding-3-small"
+    qdrant_url: str | None = None
+    qdrant_api_key: str | None = None
+    qdrant_collection: str = "nextspace_docs"
+
     @field_validator(
         "smtp_host",
         "smtp_username",
@@ -67,6 +80,9 @@ class Settings(BaseSettings):
         "aws_access_key_id",
         "aws_secret_access_key",
         "aws_s3_bucket",
+        "openai_api_key",
+        "qdrant_url",
+        "qdrant_api_key",
         mode="before",
     )
     @classmethod
