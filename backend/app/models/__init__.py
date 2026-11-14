@@ -1,3 +1,4 @@
+from app.models.ai_chat import AiConversation, AiMessage
 from app.models.chat import (
     Conversation,
     ConversationParticipant,
@@ -23,6 +24,8 @@ from app.models.team import Team, TeamMember
 from app.models.user import User, UserRole
 
 __all__ = [
+    "AiConversation",
+    "AiMessage",
     "Company",
     "Conversation",
     "ConversationParticipant",

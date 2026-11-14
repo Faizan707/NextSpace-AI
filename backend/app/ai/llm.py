@@ -123,25 +123,37 @@ def _ollama_chat(
         "model": model,
         "messages": messages,
         "stream": False,
-        "options": {"temperature": temperature},
+        # Qwen3 "thinking" can burn the whole timeout before any tool JSON appears.
+        "think": False,
+        "options": {
+            "temperature": temperature,
+            "num_predict": 512,
+        },
     }
     if tools:
         payload["tools"] = tools
-    with httpx.Client(timeout=180.0) as client:
-        response = client.post(f"{base}/api/chat", json=payload)
-        if response.status_code >= 400:
-            raise LlmError(f"Ollama chat failed ({response.status_code}): {response.text[:300]}")
-        data = response.json()
-        message = data.get("message") or {}
-        content = message.get("content")
-        if content is None:
-            content = ""
-        if not isinstance(content, str):
-            raise LlmError("Ollama chat response missing message.content")
-        return {
-            "content": content,
-            "tool_calls": _normalize_tool_calls(message.get("tool_calls")),
-        }
+    try:
+        with httpx.Client(timeout=120.0) as client:
+            response = client.post(f"{base}/api/chat", json=payload)
+    except httpx.TimeoutException as exc:
+        raise LlmError(
+            "AI model timed out. Ollama is slow or busy — retry, or keep the request shorter."
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise LlmError(f"Ollama connection failed: {exc}") from exc
+    if response.status_code >= 400:
+        raise LlmError(f"Ollama chat failed ({response.status_code}): {response.text[:300]}")
+    data = response.json()
+    message = data.get("message") or {}
+    content = message.get("content")
+    if content is None:
+        content = ""
+    if not isinstance(content, str):
+        raise LlmError("Ollama chat response missing message.content")
+    return {
+        "content": content,
+        "tool_calls": _normalize_tool_calls(message.get("tool_calls")),
+    }
 
 
 def _openai_embed(texts: list[str]) -> list[list[float]]:
@@ -188,24 +200,29 @@ def _openai_chat(
     if tools:
         payload["tools"] = tools
         payload["tool_choice"] = "auto"
-    with httpx.Client(timeout=180.0) as client:
-        response = client.post(
-            f"{base}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {settings.openai_api_key}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-        )
-        if response.status_code >= 400:
-            raise LlmError(f"OpenAI chat failed ({response.status_code}): {response.text[:300]}")
-        data = response.json()
-        try:
-            message = data["choices"][0]["message"]
-        except (KeyError, IndexError, TypeError) as exc:
-            raise LlmError("OpenAI chat response malformed") from exc
-        content = message.get("content") or ""
-        return {
-            "content": content if isinstance(content, str) else "",
-            "tool_calls": _normalize_tool_calls(message.get("tool_calls")),
-        }
+    try:
+        with httpx.Client(timeout=90.0) as client:
+            response = client.post(
+                f"{base}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.openai_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            )
+    except httpx.TimeoutException as exc:
+        raise LlmError("OpenAI timed out — please retry.") from exc
+    except httpx.HTTPError as exc:
+        raise LlmError(f"OpenAI connection failed: {exc}") from exc
+    if response.status_code >= 400:
+        raise LlmError(f"OpenAI chat failed ({response.status_code}): {response.text[:300]}")
+    data = response.json()
+    try:
+        message = data["choices"][0]["message"]
+    except (KeyError, IndexError, TypeError) as exc:
+        raise LlmError("OpenAI chat response malformed") from exc
+    content = message.get("content") or ""
+    return {
+        "content": content if isinstance(content, str) else "",
+        "tool_calls": _normalize_tool_calls(message.get("tool_calls")),
+    }

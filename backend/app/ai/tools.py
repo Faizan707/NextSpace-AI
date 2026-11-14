@@ -90,10 +90,48 @@ def tool_specs() -> list[dict[str, Any]]:
             "type": "function",
             "function": {
                 "name": "list_projects",
-                "description": "List projects. Optionally filter by space_id.",
+                "description": (
+                    "List projects the user can access (created by them or they are a member). "
+                    "Optionally filter by space_id or name query. Includes can_update flag."
+                ),
                 "parameters": {
                     "type": "object",
-                    "properties": {"space_id": {"type": "integer"}},
+                    "properties": {
+                        "space_id": {"type": "integer"},
+                        "query": {
+                            "type": "string",
+                            "description": "Optional case-insensitive name filter, e.g. frontend",
+                        },
+                    },
+                    "additionalProperties": False,
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "update_project",
+                "description": (
+                    "Rename or update a project. Allowed only for the project creator or company/space admin "
+                    "(tenant owner / space creator). Plain project members who were only added cannot rename. "
+                    "Identify by project_id, or by project_name (+ optional space_id). Check can_update from list_projects first."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "integer"},
+                        "project_name": {
+                            "type": "string",
+                            "description": "Current project name to find when project_id is unknown.",
+                        },
+                        "space_id": {"type": "integer"},
+                        "name": {"type": "string", "description": "New project name."},
+                        "description": {"type": "string"},
+                        "status": {
+                            "type": "string",
+                            "enum": ["open", "in_progress", "completed"],
+                        },
+                    },
                     "additionalProperties": False,
                 },
             },
@@ -391,16 +429,16 @@ def update_space(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     return {"ok": True, "space": {"id": space.id, "name": space.name, "description": space.description}}
 
 
-def list_projects(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+def _accessible_projects(ctx: ToolContext, *, space_id: int | None = None) -> list[Project]:
     spaces = _user_spaces(ctx)
-    space_ids = [s.id for s in spaces]
-    if args.get("space_id") is not None:
-        space_id = int(args["space_id"])
-        if space_id not in space_ids:
+    space_by_id = {s.id: s for s in spaces}
+    space_ids = list(space_by_id)
+    if space_id is not None:
+        if space_id not in space_by_id:
             raise ValueError("You do not have access to that space")
         space_ids = [space_id]
     if not space_ids:
-        return {"projects": []}
+        return []
     query = (
         select(Project)
         .where(Project.space_id.in_(space_ids))
@@ -421,7 +459,21 @@ def list_projects(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
             .options(selectinload(Project.space))
             .order_by(Project.created_at.desc())
         )
-    projects = list(ctx.db.scalars(query).unique().all())
+    return list(ctx.db.scalars(query).unique().all())
+
+
+def _can_update_project(ctx: ToolContext, space: Space, project: Project) -> bool:
+    """Creator or admin (tenant owner / space creator) only — not plain project members."""
+    return can_manage_space(ctx.user, space) or project.created_by_id == ctx.user.id
+
+
+def list_projects(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    space_id = int(args["space_id"]) if args.get("space_id") is not None else None
+    projects = _accessible_projects(ctx, space_id=space_id)
+    name_query = str(args.get("query") or "").strip().lower()
+    if name_query:
+        projects = [p for p in projects if name_query in (p.name or "").lower()]
+    spaces = {s.id: s for s in _user_spaces(ctx)}
     return {
         "projects": [
             {
@@ -431,9 +483,95 @@ def list_projects(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
                 "space_name": p.space.name if p.space else None,
                 "progress": p.progress,
                 "status": p.status,
+                "created_by_id": p.created_by_id,
+                "can_update": _can_update_project(ctx, spaces[p.space_id], p)
+                if p.space_id in spaces
+                else False,
             }
             for p in projects
         ]
+    }
+
+
+def update_project(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    new_name = str(args["name"]).strip() if args.get("name") is not None else None
+    if new_name is not None and not new_name:
+        raise ValueError("name cannot be empty")
+    if (
+        new_name is None
+        and "description" not in args
+        and args.get("status") is None
+    ):
+        raise ValueError("Provide name, description, and/or status to update")
+
+    project: Project | None = None
+    space: Space | None = None
+    if args.get("project_id") is not None:
+        project_id = int(args["project_id"])
+        space_id = int(args["space_id"]) if args.get("space_id") is not None else None
+        if space_id is not None:
+            space, project = _get_project(ctx, space_id, project_id)
+        else:
+            candidates = [p for p in _accessible_projects(ctx) if p.id == project_id]
+            if not candidates:
+                raise ValueError("Project not found or you do not have access")
+            project = candidates[0]
+            space = get_company_space(ctx.db, project.space_id, ctx.user.company_id)
+    else:
+        project_name = str(args.get("project_name") or "").strip()
+        if not project_name:
+            raise ValueError("Provide project_id or project_name")
+        space_id = int(args["space_id"]) if args.get("space_id") is not None else None
+        matches = [
+            p
+            for p in _accessible_projects(ctx, space_id=space_id)
+            if (p.name or "").strip().lower() == project_name.lower()
+        ]
+        if not matches:
+            # fallback: partial match
+            matches = [
+                p
+                for p in _accessible_projects(ctx, space_id=space_id)
+                if project_name.lower() in (p.name or "").lower()
+            ]
+        if not matches:
+            raise ValueError(f"No accessible project matching {project_name!r}")
+        if len(matches) > 1:
+            return {
+                "error": "Multiple projects matched; pass project_id",
+                "matches": [
+                    {"id": p.id, "name": p.name, "space_id": p.space_id} for p in matches
+                ],
+            }
+        project = matches[0]
+        space = get_company_space(ctx.db, project.space_id, ctx.user.company_id)
+
+    assert space is not None and project is not None
+    if not _can_update_project(ctx, space, project):
+        raise ValueError(
+            "Not allowed to rename this project. Only the project creator or an admin "
+            "(company owner / space creator) can; being a project member is not enough."
+        )
+
+    if new_name is not None:
+        project.name = new_name
+    if "description" in args:
+        project.description = (
+            str(args["description"]).strip() if args["description"] is not None else None
+        )
+    if args.get("status") is not None:
+        project.status = str(args["status"])
+
+    ctx.db.commit()
+    return {
+        "ok": True,
+        "project": {
+            "id": project.id,
+            "name": project.name,
+            "description": project.description,
+            "status": project.status,
+            "space_id": project.space_id,
+        },
     }
 
 
@@ -689,6 +827,7 @@ TOOL_HANDLERS: dict[str, Callable[[ToolContext, dict[str, Any]], Any]] = {
     "create_space": create_space,
     "update_space": update_space,
     "list_projects": list_projects,
+    "update_project": update_project,
     "list_my_tasks": list_my_tasks,
     "create_task": create_task,
     "assign_task": assign_task,

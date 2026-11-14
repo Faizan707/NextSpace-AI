@@ -9,6 +9,8 @@ from app.database import Base, engine
 from sqlalchemy import inspect, select, text
 
 from app.models import (  # noqa: F401
+    AiConversation,
+    AiMessage,
     Company,
     Conversation,
     ConversationParticipant,
@@ -285,7 +287,7 @@ async def lifespan(_: FastAPI):
     if not raw_db or db_host in {"localhost", "127.0.0.1", "::1"}:
         print(
             "DIAG WARN: DATABASE_URL missing in container. "
-            "Railway → this service → Variables → enable/share DATABASE_URL → Redeploy."
+            "Railway -> this service -> Variables -> enable/share DATABASE_URL -> Redeploy."
         )
     Base.metadata.create_all(bind=engine)
     _ensure_project_columns()

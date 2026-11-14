@@ -40,4 +40,8 @@ export const queryKeys = {
     list: ['notifications'] as const,
     unreadCount: ['notifications', 'unread-count'] as const,
   },
+  ai: {
+    conversations: ['ai', 'conversations'] as const,
+    conversation: (id: number) => ['ai', 'conversations', id] as const,
+  },
 }

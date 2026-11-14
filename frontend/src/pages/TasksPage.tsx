@@ -1,10 +1,12 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { FiSearch } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
 import {
   Alert,
   Badge,
   Button,
   DataTable,
+  Input,
   formatTableDate,
 } from '../components/ui'
 import type { BadgeTone, DataTableColumn } from '../components/ui'
@@ -24,6 +26,29 @@ export function TasksPage() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const { data: tasks = [], isLoading, error } = useWorkTasksQuery()
+  const [query, setQuery] = useState('')
+
+  const filteredTasks = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return tasks
+    return tasks.filter((task) => {
+      const haystack = [
+        task.title,
+        task.stage_name,
+        task.priority,
+        task.project_name,
+        task.space_name,
+        task.assignee?.full_name,
+        task.assignee?.email,
+        task.created_by.full_name,
+        task.created_by.email,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(q)
+    })
+  }, [tasks, query])
 
   const columns = useMemo<DataTableColumn<WorkTask>[]>(
     () => [
@@ -143,13 +168,24 @@ export function TasksPage() {
         </Alert>
       ) : null}
 
+      <div className="fade-up-delay mb-3 max-w-sm">
+        <Input
+          id="task-search"
+          label="Search tasks"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Title, project, assignee, stage…"
+          leading={<FiSearch size={16} aria-hidden />}
+        />
+      </div>
+
       <div className="fade-up-delay overflow-hidden rounded-[20px] border border-line bg-surface shadow-sm">
         <DataTable
           columns={columns}
-          data={tasks}
+          data={filteredTasks}
           getRowId={(task) => task.id}
           loading={isLoading}
-          emptyMessage="No tasks to show."
+          emptyMessage={query.trim() ? 'No tasks match your search.' : 'No tasks to show.'}
           defaultSortId="updated"
           defaultSortDir="desc"
         />

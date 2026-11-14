@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useCompanyQuery, useRealtime, useSpacesQuery } from '../../hooks'
 import { useAuthStore } from '../../stores/authStore'
 import { cn } from '../../lib/cn'
+import { AiAssistantFab } from '../ai/AiAssistantFab'
 import { NotificationBell } from './NotificationBell'
 import { UserMenu } from './UserMenu'
 
@@ -120,6 +121,8 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
+
+      <AiAssistantFab />
     </div>
   )
 }

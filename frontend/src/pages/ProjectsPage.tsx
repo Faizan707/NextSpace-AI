@@ -1,10 +1,12 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { FiSearch } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
 import {
   Alert,
   Badge,
   Button,
   DataTable,
+  Input,
   formatTableDate,
 } from '../components/ui'
 import type { BadgeTone, DataTableColumn } from '../components/ui'
@@ -22,6 +24,27 @@ export function ProjectsPage() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const { data: projects = [], isLoading, error } = useWorkProjectsQuery()
+  const [query, setQuery] = useState('')
+
+  const filteredProjects = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return projects
+    return projects.filter((project) => {
+      const haystack = [
+        project.name,
+        project.space_name,
+        project.status,
+        statusMeta[project.status]?.label,
+        project.created_by.full_name,
+        project.created_by.email,
+        ...(project.members || []).flatMap((m) => [m.full_name, m.email]),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(q)
+    })
+  }, [projects, query])
 
   const columns = useMemo<DataTableColumn<WorkProject>[]>(
     () => [
@@ -139,13 +162,24 @@ export function ProjectsPage() {
         </Alert>
       ) : null}
 
+      <div className="fade-up-delay mb-3 max-w-sm">
+        <Input
+          id="project-search"
+          label="Search projects"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Name, space, status, creator…"
+          leading={<FiSearch size={16} aria-hidden />}
+        />
+      </div>
+
       <div className="fade-up-delay overflow-hidden rounded-[20px] border border-line bg-surface shadow-sm">
         <DataTable
           columns={columns}
-          data={projects}
+          data={filteredProjects}
           getRowId={(project) => project.id}
           loading={isLoading}
-          emptyMessage="No projects to show."
+          emptyMessage={query.trim() ? 'No projects match your search.' : 'No projects to show.'}
           defaultSortId="created"
           defaultSortDir="desc"
         />

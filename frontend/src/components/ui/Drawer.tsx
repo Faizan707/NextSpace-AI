@@ -14,6 +14,7 @@ interface DrawerProps {
   footer?: ReactNode
   size?: 'md' | 'lg'
   headerExtra?: ReactNode
+  bodyClassName?: string
 }
 
 export function Drawer({
@@ -26,6 +27,7 @@ export function Drawer({
   footer,
   size = 'md',
   headerExtra,
+  bodyClassName,
 }: DrawerProps) {
   useEffect(() => {
     if (!open) return
@@ -88,7 +90,14 @@ export function Drawer({
               </Button>
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-5">{children}</div>
+            <div
+              className={
+                bodyClassName ??
+                'flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-5'
+              }
+            >
+              {children}
+            </div>
 
             {footer ? (
               <div className="border-t border-line px-6 py-4">{footer}</div>

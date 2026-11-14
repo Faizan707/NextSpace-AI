@@ -80,3 +80,10 @@ export {
   useUpdateAdminUserMutation,
   useRevokeUserAccessMutation,
 } from './useAdmin'
+export {
+  useAiConversationsQuery,
+  useAiConversationQuery,
+  useCreateAiConversationMutation,
+  useDeleteAiConversationMutation,
+  useAiChatMutation,
+} from './useAiChat'
