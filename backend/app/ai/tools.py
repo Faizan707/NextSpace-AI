@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -157,13 +158,20 @@ def tool_specs() -> list[dict[str, Any]]:
             "type": "function",
             "function": {
                 "name": "create_task",
-                "description": "Create a task in a project. Defaults to Todo stage. Can assign by user id or email.",
+                "description": (
+                    "Create a task in a project. Prefer project_name (partial names OK, e.g. 'yally' → 'yally ai'). "
+                    "Defaults to Todo stage. Can assign by user id or email. Do not invent project_id."
+                ),
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "space_id": {"type": "integer"},
-                        "project_id": {"type": "integer"},
                         "title": {"type": "string"},
+                        "project_name": {
+                            "type": "string",
+                            "description": "Project name or partial name spoken by the user.",
+                        },
+                        "project_id": {"type": "integer"},
+                        "space_id": {"type": "integer"},
                         "description": {"type": "string"},
                         "priority": {"type": "string", "enum": ["low", "medium", "high"]},
                         "assignee_id": {"type": "integer"},
@@ -173,7 +181,7 @@ def tool_specs() -> list[dict[str, Any]]:
                             "description": "Stage name like Todo, In Progress, Done. Default Todo.",
                         },
                     },
-                    "required": ["space_id", "project_id", "title"],
+                    "required": ["title"],
                     "additionalProperties": False,
                 },
             },
@@ -467,12 +475,94 @@ def _can_update_project(ctx: ToolContext, space: Space, project: Project) -> boo
     return can_manage_space(ctx.user, space) or project.created_by_id == ctx.user.id
 
 
+def _score_project_name(name: str, query: str) -> int | None:
+    """Higher is better. None = no match. Supports partials like 'yally' → 'yally ai'."""
+    n = (name or "").strip().lower()
+    q = (query or "").strip().lower()
+    if not n or not q:
+        return None
+    if n == q:
+        return 1000
+    if n.startswith(q + " ") or n.startswith(q + "-") or n.startswith(q + "_"):
+        return 900 - len(n)
+    if n.startswith(q):
+        return 850 - len(n)
+    if q in n:
+        return 700 - len(n)
+    tokens = [t for t in re.split(r"[\s_\-]+", q) if t]
+    if tokens and all(t in n for t in tokens):
+        return 600 - len(n)
+    return None
+
+
+def _match_projects_by_name(
+    ctx: ToolContext,
+    project_name: str,
+    *,
+    space_id: int | None = None,
+) -> list[Project]:
+    scored: list[tuple[int, Project]] = []
+    for project in _accessible_projects(ctx, space_id=space_id):
+        score = _score_project_name(project.name or "", project_name)
+        if score is not None:
+            scored.append((score, project))
+    scored.sort(key=lambda item: (-item[0], (item[1].name or "").lower()))
+    if not scored:
+        return []
+    best = scored[0][0]
+    # Keep only top-tier matches so 'yally' → 'yally ai' wins cleanly.
+    return [project for score, project in scored if score >= best - 50]
+
+
+def _resolve_project_ref(
+    ctx: ToolContext,
+    args: dict[str, Any],
+) -> tuple[Space, Project] | dict[str, Any]:
+    """Resolve by project_name (preferred) or project_id. Returns error dict if ambiguous."""
+    space_id = int(args["space_id"]) if args.get("space_id") is not None else None
+    project_name = str(args.get("project_name") or "").strip()
+
+    if project_name:
+        matches = _match_projects_by_name(ctx, project_name, space_id=space_id)
+        if not matches:
+            raise ValueError(f"No accessible project matching {project_name!r}")
+        if len(matches) > 1:
+            return {
+                "error": "Multiple projects matched; ask the user which one, or pass project_id",
+                "matches": [
+                    {
+                        "id": p.id,
+                        "name": p.name,
+                        "space_id": p.space_id,
+                        "space_name": p.space.name if p.space else None,
+                    }
+                    for p in matches
+                ],
+            }
+        project = matches[0]
+        space = get_company_space(ctx.db, project.space_id, ctx.user.company_id)
+        return space, project
+
+    if args.get("project_id") is not None:
+        project_id = int(args["project_id"])
+        if space_id is not None:
+            return _get_project(ctx, space_id, project_id)
+        candidates = [p for p in _accessible_projects(ctx) if p.id == project_id]
+        if not candidates:
+            raise ValueError("Project not found or you do not have access")
+        project = candidates[0]
+        space = get_company_space(ctx.db, project.space_id, ctx.user.company_id)
+        return space, project
+
+    raise ValueError("Provide project_name (preferred) or project_id")
+
+
 def list_projects(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     space_id = int(args["space_id"]) if args.get("space_id") is not None else None
     projects = _accessible_projects(ctx, space_id=space_id)
-    name_query = str(args.get("query") or "").strip().lower()
+    name_query = str(args.get("query") or "").strip()
     if name_query:
-        projects = [p for p in projects if name_query in (p.name or "").lower()]
+        projects = _match_projects_by_name(ctx, name_query, space_id=space_id)
     spaces = {s.id: s for s in _user_spaces(ctx)}
     return {
         "projects": [
@@ -504,49 +594,10 @@ def update_project(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     ):
         raise ValueError("Provide name, description, and/or status to update")
 
-    project: Project | None = None
-    space: Space | None = None
-    if args.get("project_id") is not None:
-        project_id = int(args["project_id"])
-        space_id = int(args["space_id"]) if args.get("space_id") is not None else None
-        if space_id is not None:
-            space, project = _get_project(ctx, space_id, project_id)
-        else:
-            candidates = [p for p in _accessible_projects(ctx) if p.id == project_id]
-            if not candidates:
-                raise ValueError("Project not found or you do not have access")
-            project = candidates[0]
-            space = get_company_space(ctx.db, project.space_id, ctx.user.company_id)
-    else:
-        project_name = str(args.get("project_name") or "").strip()
-        if not project_name:
-            raise ValueError("Provide project_id or project_name")
-        space_id = int(args["space_id"]) if args.get("space_id") is not None else None
-        matches = [
-            p
-            for p in _accessible_projects(ctx, space_id=space_id)
-            if (p.name or "").strip().lower() == project_name.lower()
-        ]
-        if not matches:
-            # fallback: partial match
-            matches = [
-                p
-                for p in _accessible_projects(ctx, space_id=space_id)
-                if project_name.lower() in (p.name or "").lower()
-            ]
-        if not matches:
-            raise ValueError(f"No accessible project matching {project_name!r}")
-        if len(matches) > 1:
-            return {
-                "error": "Multiple projects matched; pass project_id",
-                "matches": [
-                    {"id": p.id, "name": p.name, "space_id": p.space_id} for p in matches
-                ],
-            }
-        project = matches[0]
-        space = get_company_space(ctx.db, project.space_id, ctx.user.company_id)
-
-    assert space is not None and project is not None
+    resolved = _resolve_project_ref(ctx, args)
+    if isinstance(resolved, dict):
+        return resolved
+    space, project = resolved
     if not _can_update_project(ctx, space, project):
         raise ValueError(
             "Not allowed to rename this project. Only the project creator or an admin "
@@ -597,13 +648,16 @@ def list_my_tasks(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
 
 
 def create_task(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
-    space_id = int(args["space_id"])
-    project_id = int(args["project_id"])
     title = str(args.get("title") or "").strip()
     if not title:
         raise ValueError("title is required")
-    _space, project = _get_project(ctx, space_id, project_id)
-    stage = _get_stage(ctx, project_id, args.get("stage_name"))
+    resolved = _resolve_project_ref(ctx, args)
+    if isinstance(resolved, dict):
+        return resolved
+    space, project = resolved
+    # Ensure memberships are loaded for assignee auto-add
+    space, project = _get_project(ctx, space.id, project.id)
+    stage = _get_stage(ctx, project.id, args.get("stage_name"))
     assignee_id = None
     if args.get("assignee_id") is not None or args.get("assignee_email"):
         assignee = _resolve_user(
@@ -626,7 +680,7 @@ def create_task(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
         priority = "medium"
 
     task = ProjectTask(
-        project_id=project_id,
+        project_id=project.id,
         stage_id=stage.id,
         title=title,
         description=(str(args["description"]).strip() if args.get("description") else None),
@@ -637,7 +691,7 @@ def create_task(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     )
     ctx.db.add(task)
     ctx.db.flush()
-    recalculate_project_progress(ctx.db, project_id)
+    recalculate_project_progress(ctx.db, project.id)
     if assignee_id is not None:
         actor_label = ctx.user.full_name or ctx.user.email
         notify_user(
@@ -647,7 +701,7 @@ def create_task(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
             type="task_assigned",
             title=f"Assigned to “{task.title}”",
             body=f"{actor_label} assigned you this task via AI assistant.",
-            link=f"/app/spaces/{space_id}/projects/{project_id}",
+            link=f"/app/spaces/{space.id}/projects/{project.id}",
         )
     ctx.db.commit()
     created = ctx.db.scalar(

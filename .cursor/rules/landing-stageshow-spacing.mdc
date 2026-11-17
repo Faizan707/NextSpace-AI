@@ -1,0 +1,39 @@
+---
+description: Accurate spacing for landing page and Stageshow demos — never flush to edges
+globs: frontend/src/pages/LandingPage.tsx,frontend/src/stageshow/**/*
+alwaysApply: false
+---
+
+# Landing + Stageshow spacing
+
+Mistakes that keep coming back: traffic lights / copy / badges stuck to the left edge, clipped bento content, huge gaps inside status pills. Follow these numbers before shipping UI.
+
+## Page shell
+
+- Landing content column: at least `px-8` / `lg:px-12` — never `px-4` or edge-flush.
+- Outer demo frame around a Stage: add real padding (`p-4`–`p-6`), do not let the stage kiss the card border.
+
+## Stageshow window chrome
+
+- Stage ↔ window gutter: **≥ 40px** left/right (`--gutter`). Never `< 28px`.
+- Window title bar (traffic lights): **≥ 20px** padding-left on `.ss-window__bar`. Override kit defaults if needed.
+- In-window app bars / board columns: **≥ 18px** horizontal padding.
+- Crop only empty ground or chrome foot — never crop real words, badges, or composer text.
+
+## Stacked demos
+
+- Prefer **separate** surfaces (board above, AI panel below) with clear gap — do not overlap unless the brief asks for overlap.
+- AI panel uses the same left/right gutter as the board window.
+
+## Bento tiles
+
+- Tile copy: top padding ≈ tile gap (around `24–28px`); left padding matches `--pad` (≥ `22px`).
+- Pictures pinned to the tile bottom must stay **inside** the tile: `left/right: var(--pad)`, `max-width: 100%`, `box-sizing: border-box`, truncate long emails.
+- Status pills (`Joined`, `Active`, `Assigned`): icon↔label gap **3–4px** only. Padding `0 9px`, height ~24px. Do not stretch badges with States grid width tricks.
+- No content may visually clip on the right edge of a tile.
+
+## Checklist before done
+
+1. Zoom the left edge of every window/card — is there clear air before the first control?
+2. Read every badge — is the tick almost touching the word (tight), not floating away?
+3. At desktop and ~390 width — is any label or pill cut off?

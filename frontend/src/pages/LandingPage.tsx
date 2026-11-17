@@ -10,6 +10,8 @@ import {
 } from 'recharts'
 import { buttonClasses } from '../components/ui/Button'
 import { useAuthStore } from '../stores/authStore'
+import { NextSpaceAiHero } from '../stageshow/NextSpaceAiHero'
+import { NextSpaceBento } from '../stageshow/NextSpaceBento'
 
 const TEAL = '#14b8a6'
 const INDIGO = '#6366f1'
@@ -66,21 +68,16 @@ function DashboardPreview({ reduceMotion }: { reduceMotion: boolean | null }) {
     <div className="relative w-full">
       <div
         aria-hidden
-        className="pointer-events-none absolute -inset-x-8 -inset-y-10 bg-[radial-gradient(520px_280px_at_70%_20%,rgba(20,184,166,0.16),transparent_60%),radial-gradient(420px_240px_at_20%_80%,rgba(99,102,241,0.14),transparent_55%)]"
+        className="pointer-events-none absolute -inset-x-6 -inset-y-8 bg-[radial-gradient(520px_280px_at_70%_20%,rgba(37,99,235,0.14),transparent_60%),radial-gradient(420px_240px_at_20%_80%,rgba(124,108,240,0.12),transparent_55%)]"
       />
 
-      <motion.div
-        className="relative"
-        initial={reduceMotion ? false : { opacity: 0, y: 36 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.75, delay: 0.18, ease: [0.22, 1, 0.36, 1] }}
-      >
+      <div className="relative">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-1">
           <div>
             <p className="m-0 font-display text-lg font-bold tracking-tight text-ink sm:text-xl">
               Dashboard overview
             </p>
-            <p className="mt-0.5 m-0 text-sm text-muted">Arbisoft · live company rollup</p>
+            <p className="mt-0.5 m-0 text-sm text-muted">Your company · live rollup</p>
           </div>
           <span className="rounded-full border border-[#e8edf3] bg-white px-3 py-1 text-xs font-semibold text-muted shadow-sm">
             Inside the app
@@ -88,36 +85,15 @@ function DashboardPreview({ reduceMotion }: { reduceMotion: boolean | null }) {
         </div>
 
         <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="rounded-[20px] border border-[#e8edf3] bg-white p-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:col-span-1">
+          <div className="rounded-[20px] border border-[#e8edf3] bg-white p-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
             <p className="m-0 text-sm font-bold text-ink">Projects analytics</p>
             <p className="mt-1 m-0 text-xs text-muted">
               Total tasks <span className="font-display font-bold text-ink">42</span>
             </p>
             <div className="mt-3 space-y-2.5">
-              <TrackBar
-                label="Completed"
-                value={24}
-                max={42}
-                color={TEAL}
-                reduceMotion={reduceMotion}
-                delay={0.35}
-              />
-              <TrackBar
-                label="In progress"
-                value={11}
-                max={42}
-                color={INDIGO}
-                reduceMotion={reduceMotion}
-                delay={0.45}
-              />
-              <TrackBar
-                label="Todo"
-                value={7}
-                max={42}
-                color="#cbd5e1"
-                reduceMotion={reduceMotion}
-                delay={0.55}
-              />
+              <TrackBar label="Completed" value={24} max={42} color={TEAL} reduceMotion={reduceMotion} delay={0.35} />
+              <TrackBar label="In progress" value={11} max={42} color={INDIGO} reduceMotion={reduceMotion} delay={0.45} />
+              <TrackBar label="Todo" value={7} max={42} color="#cbd5e1" reduceMotion={reduceMotion} delay={0.55} />
             </div>
           </div>
 
@@ -236,7 +212,7 @@ function DashboardPreview({ reduceMotion }: { reduceMotion: boolean | null }) {
             </div>
           </div>
         </div>
-      </motion.div>
+      </div>
     </div>
   )
 }
@@ -249,23 +225,21 @@ export function LandingPage() {
     reduceMotion
       ? undefined
       : {
-          initial: { opacity: 0, y: 22 },
+          initial: { opacity: 0, y: 16 },
           animate: { opacity: 1, y: 0 },
-          transition: { duration: 0.65, delay, ease: [0.22, 1, 0.36, 1] as const },
+          transition: { duration: 0.55, delay, ease: [0.22, 1, 0.36, 1] as const },
         }
 
   return (
-    <div className="relative z-1 min-h-dvh overflow-hidden">
+    <div className="relative z-1 min-h-dvh overflow-x-hidden">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(1100px_620px_at_88%_0%,rgba(20,184,166,0.14),transparent_55%),radial-gradient(720px_420px_at_0%_30%,rgba(99,102,241,0.12),transparent_50%),linear-gradient(180deg,#f7fafc_0%,#eef3f8_55%,#e8eef6_100%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_520px_at_88%_-8%,rgba(37,99,235,0.14),transparent_55%),radial-gradient(620px_360px_at_-4%_22%,rgba(124,108,240,0.1),transparent_50%),linear-gradient(180deg,#f7f9fc_0%,#eef3f9_42%,#e8eef6_100%)]"
       />
 
-      <header className="relative mx-auto flex w-[min(1180px,calc(100%-2rem))] items-center justify-between pt-6 md:pt-8">
-        <p className="font-display text-[1.2rem] font-extrabold tracking-tight text-ink md:text-[1.35rem]">
-          NextSpace
-        </p>
-        <div className="flex items-center gap-2">
+      <header className="relative mx-auto flex w-full max-w-[1140px] items-center justify-between px-8 pt-6 sm:px-10 md:pt-8 lg:px-12">
+        <p className="font-display text-[1.2rem] font-extrabold tracking-tight text-ink">NextSpace</p>
+        <div className="flex items-center gap-2.5">
           {token ? (
             <Link className={buttonClasses('primary', undefined, 'sm')} to="/app">
               Open dashboard
@@ -283,28 +257,28 @@ export function LandingPage() {
         </div>
       </header>
 
-      <section className="relative mx-auto grid min-h-[calc(100dvh-5.5rem)] w-[min(1180px,calc(100%-2rem))] items-center gap-10 py-12 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.15fr)] lg:gap-12 lg:py-8">
-        <div className="relative min-w-0 max-w-xl">
+      <section className="relative mx-auto grid w-full max-w-[1140px] items-center gap-10 px-8 pt-12 pb-10 sm:px-10 md:gap-12 md:pt-14 lg:grid-cols-[minmax(0,0.88fr)_minmax(0,1.12fr)] lg:gap-14 lg:px-12 lg:pt-16">
+        <div className="relative min-w-0 max-w-[32rem]">
           <motion.p
-            className="m-0 font-display text-[clamp(2.2rem,4.4vw,3.1rem)] font-extrabold leading-[0.92] tracking-[-0.045em] text-ink"
-            {...rise(0.05)}
+            className="m-0 font-display text-[clamp(2.5rem,5vw,3.5rem)] font-extrabold leading-[0.92] tracking-[-0.048em] text-ink"
+            {...rise(0.04)}
           >
             NextSpace
           </motion.p>
           <motion.h1
-            className="mt-4 m-0 max-w-[15ch] font-display text-[clamp(1.35rem,2.6vw,1.85rem)] font-bold leading-[1.2] tracking-[-0.03em] text-ink/85"
-            {...rise(0.12)}
+            className="mt-6 m-0 max-w-[16ch] font-display text-[clamp(1.5rem,2.5vw,2rem)] font-bold leading-[1.22] tracking-[-0.03em] text-ink/80"
+            {...rise(0.1)}
           >
             The company dashboard your team opens every day
           </motion.h1>
           <motion.p
-            className="mt-4 m-0 max-w-[36ch] text-[1.05rem] leading-relaxed text-muted"
-            {...rise(0.2)}
+            className="mt-5 m-0 max-w-[34ch] text-[1.06rem] leading-[1.65] text-muted"
+            {...rise(0.16)}
           >
-            After login you get a live overview of spaces, projects, priorities, and who’s carrying
-            the work — not another empty home screen.
+            Spaces, projects, priorities, and who’s carrying the work — plus AI that can assign and
+            update the board from chat.
           </motion.p>
-          <motion.div className="mt-8 flex flex-wrap gap-3" {...rise(0.28)}>
+          <motion.div className="mt-10 flex flex-wrap items-center gap-3" {...rise(0.22)}>
             <Link className={buttonClasses('primary')} to={token ? '/app' : '/register'}>
               {token ? 'Go to dashboard' : 'Create your workspace'}
             </Link>
@@ -316,60 +290,60 @@ export function LandingPage() {
           </motion.div>
         </div>
 
-        <div className="relative min-w-0" aria-hidden>
+        <motion.div
+          className="relative min-w-0 w-full"
+          aria-hidden
+          initial={reduceMotion ? false : { opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.65, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+        >
           <DashboardPreview reduceMotion={reduceMotion} />
+        </motion.div>
+      </section>
+
+      <section className="relative mx-auto w-full max-w-[1140px] px-8 pb-16 sm:px-10 md:pb-20 lg:px-12">
+        <div className="mb-5 max-w-xl">
+          <p className="m-0 text-[0.72rem] font-bold uppercase tracking-[0.14em] text-accent">
+            Workspace AI
+          </p>
+          <h2 className="mt-2 m-0 font-display text-[clamp(1.35rem,2.4vw,1.75rem)] font-bold tracking-tight text-ink">
+            Ask once. Watch the board move.
+          </h2>
+        </div>
+        <div className="overflow-hidden rounded-[24px] border border-[#e8edf3] bg-[#e8eef6]/40 p-4 shadow-[0_12px_40px_rgba(15,23,42,0.06)] sm:p-5 md:p-6">
+          <NextSpaceAiHero />
         </div>
       </section>
 
-      <section className="relative border-t border-line/70 bg-white/55 backdrop-blur-sm">
-        <div className="mx-auto w-[min(1180px,calc(100%-2rem))] py-16 md:py-20">
-          <p className="text-xs font-bold uppercase tracking-[0.1em] text-accent">Inside NextSpace</p>
-          <h2 className="mt-2 max-w-[20ch] font-display text-[clamp(1.7rem,3vw,2.35rem)] font-bold tracking-tight text-ink">
-            Same soft dashboard, with your real company data
-          </h2>
-          <p className="mt-3 max-w-[48ch] text-muted">
-            Invite the team, open spaces, move work on boards — everything rolls up into the
-            overview you previewed above.
-          </p>
+      <section className="relative border-t border-line/60 bg-[#fbfcfe]">
+        <div className="mx-auto w-full max-w-[1140px] px-8 py-16 sm:px-10 md:py-20 lg:px-12 lg:py-24">
+          <div className="max-w-2xl">
+            <p className="m-0 text-[0.72rem] font-bold uppercase tracking-[0.14em] text-accent">
+              Inside NextSpace
+            </p>
+            <h2 className="mt-3 m-0 font-display text-[clamp(1.85rem,3.2vw,2.55rem)] font-bold leading-[1.12] tracking-[-0.035em] text-ink">
+              What the workspace is built for
+            </h2>
+            <p className="mt-4 m-0 max-w-[46ch] text-[1.05rem] leading-relaxed text-muted">
+              AI that takes action, boards that measure progress, spaces for teams, and invites that
+              keep one company tenancy.
+            </p>
+          </div>
 
-          <ol className="mt-12 grid gap-10 md:grid-cols-3 md:gap-8">
-            {[
-              {
-                step: '01',
-                title: 'Company tenancy',
-                body: 'Register once. Owners invite members by email and keep one shared workspace.',
-              },
-              {
-                step: '02',
-                title: 'Spaces & boards',
-                body: 'Run projects on stages. Progress updates as tasks move from todo to done.',
-              },
-              {
-                step: '03',
-                title: 'Live dashboard',
-                body: 'Completion, priorities, space load, and team capacity — ready the moment you sign in.',
-              },
-            ].map((item) => (
-              <li key={item.step} className="list-none">
-                <p className="m-0 font-display text-sm font-bold tracking-[0.12em] text-accent">
-                  {item.step}
-                </p>
-                <h3 className="mt-3 m-0 font-display text-xl font-bold text-ink">{item.title}</h3>
-                <p className="mt-2 m-0 text-[0.95rem] leading-relaxed text-muted">{item.body}</p>
-              </li>
-            ))}
-          </ol>
+          <div className="mt-12 md:mt-14">
+            <NextSpaceBento />
+          </div>
 
-          <div className="mt-12">
+          <div className="mt-14">
             <Link className={buttonClasses('primary')} to={token ? '/app' : '/register'}>
-              {token ? 'Open your dashboard' : 'Get this dashboard'}
+              {token ? 'Open your dashboard' : 'Get this workspace'}
             </Link>
           </div>
         </div>
       </section>
 
-      <footer className="relative border-t border-line/70">
-        <div className="mx-auto flex w-[min(1180px,calc(100%-2rem))] flex-wrap items-center justify-between gap-3 py-8">
+      <footer className="relative border-t border-line/60 bg-[#fbfcfe]">
+        <div className="mx-auto flex w-full max-w-[1140px] flex-wrap items-center justify-between gap-3 px-8 py-8 sm:px-10 lg:px-12">
           <p className="m-0 font-display text-sm font-bold text-ink">NextSpace</p>
           <p className="m-0 text-sm text-muted">Company work, one clear overview</p>
         </div>
