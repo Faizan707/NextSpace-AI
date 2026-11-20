@@ -436,76 +436,83 @@
   background: #fff;
 }
 
-/* ---- Board ---- */
+/* ---- Board: one card + stage chips (fits narrow bento cells) ---- */
 
 .ns-bento .nsb-board {
   position: absolute;
   left: var(--pad);
   right: var(--pad);
-  bottom: 0;
+  bottom: 18px;
+  width: auto;
+  max-width: 100%;
+  box-sizing: border-box;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  padding: 0 0 18px;
+  gap: 10px;
 }
 
-.ns-bento .nsb-lane {
+.ns-bento .nsb-stages {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-  padding: 10px;
-  border-radius: 16px 16px 0 0;
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-bottom: 0;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
-.ns-bento .nsb-lane[data-active] {
-  background: #fff;
-  box-shadow: 0 12px 28px -16px rgba(15, 23, 42, 0.28);
-}
-
-.ns-bento .nsb-lane-label {
+.ns-bento .nsb-stage-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  color: #64748b;
   font-size: 10px;
   font-weight: 750;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #64748b;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06);
+  transition:
+    opacity 0.3s ease,
+    background 0.3s ease,
+    color 0.3s ease;
+}
+
+.ns-bento .nsb-stage-chip[data-dim] {
+  opacity: 0.45;
+}
+
+.ns-bento .nsb-stage-chip[data-active] {
+  background: #2563eb;
+  color: #fff;
+  box-shadow: none;
 }
 
 .ns-bento .nsb-card {
   display: grid;
   gap: 12px;
+  min-width: 0;
   padding: 14px;
-  border-radius: 14px;
+  border-radius: 16px;
   background: #fff;
   border: 1px solid #e8edf4;
-}
-
-.ns-bento .nsb-card[data-dim] {
-  opacity: 0.3;
-}
-
-.ns-bento .nsb-card--arrive {
-  opacity: 0;
-  translate: -16px 0;
-  border-color: #bfdbfe;
-  box-shadow: 0 10px 22px -14px rgba(37, 99, 235, 0.4);
+  box-shadow: 0 12px 28px -18px rgba(15, 23, 42, 0.28);
   transition:
-    opacity 0.4s ease,
-    translate 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    border-color 0.35s ease,
+    box-shadow 0.35s ease,
+    translate 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.ns-bento .nsb-card--arrive[data-on] {
-  opacity: 1;
-  translate: 0 0;
+.ns-bento .nsb-card[data-on] {
+  border-color: #bfdbfe;
+  box-shadow: 0 14px 30px -16px rgba(37, 99, 235, 0.4);
+  translate: 0 -2px;
 }
 
 .ns-bento .nsb-card-title {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: -0.015em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
   color: #0f172a;
 }
 
@@ -513,7 +520,28 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ns-bento .nsb-card-who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ns-bento .nsb-card-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 650;
+  color: #475569;
+}
+
+.ns-bento .nsb-card-foot .nsb-status {
+  flex: none;
 }
 
 /* ---- Spaces ---- */
@@ -653,7 +681,8 @@
   color: #047857;
 }
 
-.ns-bento .nsb-status--accent {
+.ns-bento .nsb-status--accent,
+.ns-bento .nsb-status--accent[data-on] {
   background: #eff4ff;
   color: #1d4ed8;
 }

@@ -225,23 +225,27 @@ function BoardTile() {
           >
             {(s) => (
               <div className="nsb-board">
-                <div className="nsb-lane">
-                  <Text className="nsb-lane-label">Todo</Text>
-                  <div className="nsb-card" data-dim={s.on || undefined}>
-                    <Text className="nsb-card-title">Homepage polish</Text>
-                    <Facepile names={['Alex']} size={18} />
-                  </div>
+                <div className="nsb-stages">
+                  <span className="nsb-stage-chip" data-dim={s.on || undefined}>
+                    Todo
+                  </span>
+                  <span className="nsb-stage-chip" data-active={s.on || undefined}>
+                    In Progress
+                  </span>
                 </div>
-                <div className="nsb-lane" data-active>
-                  <Text className="nsb-lane-label">In Progress</Text>
-                  <div className="nsb-card nsb-card--arrive" data-on={s.on || undefined}>
-                    <Text className="nsb-card-title">Homepage polish</Text>
-                    <div className="nsb-card-foot">
-                      <Facepile names={['Alex']} size={18} />
-                      <span className="nsb-status nsb-status--accent" data-on={s.on || undefined}>
-                        Active
-                      </span>
+                <div className="nsb-card" data-on={s.on || undefined}>
+                  <Text className="nsb-card-title">Homepage polish</Text>
+                  <div className="nsb-card-foot">
+                    <div className="nsb-card-who">
+                      <Avatar name="Alex" size={18} />
+                      <Text className="nsb-card-name">Alex</Text>
                     </div>
+                    <span
+                      className={s.on ? 'nsb-status nsb-status--accent' : 'nsb-status'}
+                      data-on={s.on || undefined}
+                    >
+                      {s.on ? 'Active' : 'Todo'}
+                    </span>
                   </div>
                 </div>
               </div>
