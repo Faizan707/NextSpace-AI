@@ -1,7 +1,7 @@
 import secrets
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -10,6 +10,7 @@ from app.auth.deps import get_current_user
 from app.database import get_db
 from app.models.document import Document, DocumentMember
 from app.models.user import User
+from app.rate_limit import limiter
 from app.schemas.document import ComplianceFinding, DocumentRead
 from app.schemas.space import SpaceCreatorRead, SpaceMembersAdd
 from app.services.document_compliance import (
@@ -100,7 +101,9 @@ def list_documents(
     response_model=DocumentRead,
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit("30/minute")
 async def upload_document(
+    request: Request,
     space_id: int,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -224,7 +227,9 @@ def remove_document_member(
     "/{space_id}/documents/{document_id}/compliance-check",
     response_model=DocumentRead,
 )
+@limiter.limit("10/minute")
 def run_document_compliance_check(
+    request: Request,
     space_id: int,
     document_id: int,
     db: Session = Depends(get_db),

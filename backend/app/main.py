@@ -1,12 +1,16 @@
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from sqlalchemy import inspect, select, text
 
 from app.config import get_settings
 from app.database import Base, engine
-from sqlalchemy import inspect, select, text
+from app.rate_limit import limiter
 
 from app.models import (  # noqa: F401
     AiConversation,
@@ -303,6 +307,9 @@ async def lifespan(_: FastAPI):
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list(),
@@ -329,7 +336,8 @@ app.include_router(ai_assistant.router)
 
 
 @app.get("/health")
-def health() -> dict[str, str | bool]:
+@limiter.exempt
+def health(_request: Request) -> dict[str, str | bool]:
     from app.services.email import is_email_configured
     from app.services.storage import is_s3_configured
 

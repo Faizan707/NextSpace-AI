@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -12,6 +12,7 @@ from app.database import get_db
 from app.models.company import Company
 from app.models.invite import Invite, InviteStatus
 from app.models.user import User, UserRole
+from app.rate_limit import limiter
 from app.schemas.auth import Token
 from app.schemas.invite import InviteAccept, InvitePublicRead
 from app.schemas.user import UserCreate, UserRead
@@ -20,7 +21,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
-def register(payload: UserCreate, db: Session = Depends(get_db)) -> User:
+@limiter.limit("5/minute")
+def register(request: Request, payload: UserCreate, db: Session = Depends(get_db)) -> User:
     existing = db.scalar(select(User).where(User.email == payload.email))
     if existing:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
@@ -49,7 +51,9 @@ def register(payload: UserCreate, db: Session = Depends(get_db)) -> User:
 
 
 @router.post("/login", response_model=Token)
+@limiter.limit("10/minute")
 def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ) -> Token:
@@ -92,7 +96,13 @@ def get_invite(token: str, db: Session = Depends(get_db)) -> InvitePublicRead:
 
 
 @router.post("/invites/{token}/accept", response_model=UserRead, status_code=status.HTTP_201_CREATED)
-def accept_invite(token: str, payload: InviteAccept, db: Session = Depends(get_db)) -> User:
+@limiter.limit("20/minute")
+def accept_invite(
+    request: Request,
+    token: str,
+    payload: InviteAccept,
+    db: Session = Depends(get_db),
+) -> User:
     invite = db.scalar(
         select(Invite).options(selectinload(Invite.company)).where(Invite.token == token)
     )

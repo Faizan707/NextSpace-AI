@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -12,6 +12,7 @@ from app.auth.deps import get_current_user
 from app.database import get_db
 from app.models.ai_chat import AiConversation, AiMessage
 from app.models.user import User
+from app.rate_limit import limiter
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -158,7 +159,9 @@ def delete_conversation(
 
 
 @router.post("/chat", response_model=AiChatResponse)
+@limiter.limit("20/minute")
 def ai_chat(
+    request: Request,
     payload: AiChatRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
